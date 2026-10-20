@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.vercel
+node_modules
+.DS_Store
+Thumbs.db
+*.log
+*.zip
+
+.claude/
+
+# Restos de versiones anteriores (despliegue con compilación / carpeta de entrega); ya no se usan
+entrega/
+scripts/
+package.json

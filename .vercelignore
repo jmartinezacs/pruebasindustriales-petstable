@@ -1,0 +1,10 @@
+# Vercel publica solo los archivos del sitio (index.html, apple-touch-icon.png y version.json).
+# Las fuentes, migraciones y herramientas quedan fuera.
+public/
+supabase/
+tests/
+tools/
+fuentes/
+docs/
+README.md
+.env.example
