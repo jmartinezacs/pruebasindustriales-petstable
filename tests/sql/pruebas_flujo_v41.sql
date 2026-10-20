@@ -1,3 +1,5 @@
+-- NOTA (v5.0): reglas anteriores. Desde v5 la prueba se inicia con "Iniciar prueba" antes de registrar datos
+-- y participan solo las áreas que registran; las reglas vigentes se prueban en pruebas_flujo_v5.sql.
 -- =====================================================================
 -- v4.1 · Cada área define sus parámetros; Seguridad y Mantenimiento no
 -- detienen la prueba; alta rápida de catálogos. Todo se REVIERTE.

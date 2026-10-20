@@ -4,8 +4,53 @@
 // =====================================================================
 import {
   sb, state, esc, icon, refreshIcons, toast, errMsg, checkForm, prefs, fmtDateTime, APP_VERSION, avatarHTML, ACCIONES,
-  getCat,
+  getCat, push, pill,
 } from '../core.js';
+
+// Estado y control de las notificaciones push de este dispositivo
+async function pintarNotificaciones(box) {
+  if (!box) return;
+  const est = await push.estado().catch(() => 'no-soportado');
+  const quien = 'Recibirás un aviso cuando se registre o inicie una prueba en la que participa tu área, cuando una prueba quede lista para dictamen (Alta Dirección) y cuando se emita el dictamen.';
+  const txt = {
+    activo: [pill('Activadas', 'ok'), quien, `<div class="page-actions" style="justify-content:flex-start">
+        <button class="btn primary" data-n="test">${icon('bell-ring')} Enviar aviso de prueba</button>
+        <button class="btn secondary" data-n="off">${icon('bell-off')} Desactivar en este dispositivo</button></div>
+      <details class="notif-ajustes"><summary>${icon('smartphone')} ¿No suena o no aparece en la pantalla bloqueada?</summary>
+        <p><b>Android (Chrome):</b> mantén presionado el aviso de prueba → Configuración, o ve a Ajustes → Aplicaciones → Chrome → Notificaciones → busca este sitio y activa <b>Mostrar en pantalla emergente</b>, <b>Sonido</b> y <b>Pantalla de bloqueo</b>. Revisa también que “No molestar” esté apagado.</p>
+        <p><b>iPhone:</b> Ajustes → Notificaciones → Pruebas industriales → activa <b>Permitir notificaciones</b>, <b>Pantalla bloqueada</b>, <b>Tiras</b> (estilo “Persistente”) y <b>Sonidos</b>. Revisa que el modo Concentración no lo silencie.</p>
+      </details>`],
+    inactivo: [pill('Desactivadas', 'gray'), quien, `<button class="btn primary" data-n="on">${icon('bell')} Activar notificaciones</button>`],
+    bloqueado: [pill('Bloqueadas', 'bad'), 'Las notificaciones están bloqueadas para este sitio. Permítelas desde la configuración del navegador (ícono del candado junto a la dirección) y vuelve a intentarlo.', ''],
+    instalar: [pill('Requiere instalar', 'warn'), 'En iPhone/iPad las notificaciones solo funcionan con la app instalada: toca Compartir → “Agregar a pantalla de inicio”, ábrela desde ese ícono y regresa aquí para activarlas.', ''],
+    'no-soportado': [pill('No disponibles', 'gray'), 'Este navegador no admite notificaciones web. Usa Chrome, Edge o Safari actualizados.', ''],
+  }[est];
+  box.innerHTML = `<p style="margin:0 0 8px">${txt[0]}</p><p class="hint" style="margin:0 0 10px">${esc(txt[1])}</p>${txt[2]}`;
+  refreshIcons();
+  box.querySelector('[data-n="test"]')?.addEventListener('click', async () => {
+    // Aviso local con las mismas opciones que los avisos reales (vibración, permanece en pantalla)
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      // El service worker arma el ícono con tu foto y la insignia de la app, como en los avisos reales
+      if (reg.active) {
+        reg.active.postMessage({ tipo: 'aviso-prueba', title: 'Aviso de prueba · Pruebas industriales', body: 'Así se verán los avisos de las pruebas en este dispositivo.', foto: state.profile.foto_url || null });
+        return;
+      }
+      await reg.showNotification('Aviso de prueba · Pruebas industriales', {
+        body: 'Así se verán los avisos de las pruebas en este dispositivo.', icon: '/notif-icon.png', badge: '/notif-badge.png', actions: [{ action: 'ver', title: 'Ver ahora' }],
+        tag: `prueba-${Date.now()}`, renotify: true, requireInteraction: true, silent: false, vibrate: [300, 120, 300, 120, 500], data: { url: '/#/perfil' },
+      });
+    } catch (err) { toast(errMsg(err), 'error'); }
+  });
+  box.querySelector('[data-n="on"], [data-n="off"]')?.addEventListener('click', async (e) => {
+    const b = e.currentTarget; b.disabled = true;
+    try {
+      if (b.dataset.n === 'on') { await push.activar(); toast('Notificaciones activadas en este dispositivo.', 'success'); }
+      else { await push.desactivar(); toast('Notificaciones desactivadas en este dispositivo.', 'success'); }
+    } catch (err) { toast(errMsg(err), 'error'); }
+    pintarNotificaciones(box);
+  });
+}
 
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; });
@@ -65,6 +110,8 @@ export default {
             <button data-theme-opt="dark" class="${theme === 'dark' ? 'active' : ''}">${icon('moon')} Oscuro</button>
             <button data-theme-opt="system" class="${theme === 'system' ? 'active' : ''}">${icon('monitor-smartphone')} Sistema</button>
           </div>
+          <div class="section-title" style="margin-top:22px">${icon('bell-ring')} Notificaciones en este dispositivo</div>
+          <div id="notif-box"><div class="skeleton" style="height:36px"></div></div>
           <div class="section-title" style="margin-top:22px">${icon('smartphone')} Instalar en la pantalla de inicio</div>
           ${standalone ? `<p class="hint">${icon('check-circle-2')} Ya estás usando la aplicación instalada.</p>` : `
           <button class="btn secondary hidden" id="install-btn">${icon('download')} Instalar aplicación</button>
@@ -80,6 +127,7 @@ export default {
       window.__prubindSetTheme?.(b.dataset.themeOpt);
       el.querySelectorAll('[data-theme-opt]').forEach((x) => x.classList.toggle('active', x === b));
     }));
+    pintarNotificaciones(el.querySelector('#notif-box'));
     const ib = el.querySelector('#install-btn');
     if (ib && deferredPrompt) {
       ib.classList.remove('hidden');

@@ -18,7 +18,7 @@ export default {
     el.innerHTML = `
       <section class="page-intro">
         <div><span class="eyebrow">Producción</span><h1>Batches ejecutados</h1>
-          <p>Registro de batches de todas las pruebas, por lote diario. Para capturar, abre la prueba en su etapa «Registro en proceso».</p></div>
+          <p>Registro de batches de todas las pruebas, por lote diario. Para capturar, abre la prueba en su etapa «En proceso».</p></div>
       </section>
       <div class="card">
         <div class="toolbar">

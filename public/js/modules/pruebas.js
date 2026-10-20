@@ -1,6 +1,6 @@
 // =====================================================================
 // Pruebas industriales: lista, registro (etapa 1) y expediente por etapas
-// Registro → Registro en proceso → Evaluaciones complementarias →
+// Registro → En proceso → Evaluaciones complementarias →
 // Resultados → Recomendaciones → Dictamen → Cierre.
 // Cualquier persona registra la prueba (quien primero tenga conocimiento
 // de ella) con los parámetros a evaluar por área.
@@ -8,8 +8,8 @@
 import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, nullIfEmpty, numOrNull, must, mustRow,
   DataTable, paged, sanitizeSearch, debounce, fmtDate, fmtDateTime, fmtQty, pill, estadoPill, prioPill, puedeEn, autoridad,
-  getCat, invalidateCat, opciones, ESTADOS_PRUEBA, etapasDe, CERRADAS, ABIERTAS, PRIORIDADES, CAMPOS_REGISTRO, AREAS, avatarHTML, emptyState, errorState,
-  refreshIcons, navigate, bindCounters, prefs, fmtBytes, dayStartTs, dayEndTs, ayuda,
+  getCat, invalidateCat, opciones, ESTADOS_PRUEBA, etapasDe, CERRADAS, ABIERTAS, PRIORIDADES, CAMPOS_REGISTRO, AREAS, AREAS_ORDEN, avatarHTML, emptyState, errorState,
+  refreshIcons, navigate, bindCounters, prefs, fmtBytes, dayStartTs, dayEndTs, ayuda, avisar,
 } from '../core.js';
 import { box, txt, cardHead, btn, iconBtn, aviso, vacio, accion, subirEvidencia, abrirAdjunto } from './exp_comun.js';
 import { montarSelector, montarParametrosPrueba, montarFormulacion } from './exp_registro.js';
@@ -29,7 +29,7 @@ export default {
 };
 
 // Etapa en la que se encuentra la prueba ('fin' = concluida)
-const etapaDe = (estado, e = {}) => ({ registrada: 'proceso', en_preparacion: 'proceso', preparada: 'proceso', en_ejecucion: 'proceso',
+export const etapaDe = (estado, e = {}) => ({ registrada: 'registro', en_preparacion: 'registro', preparada: 'registro', en_ejecucion: 'proceso',
   en_evaluacion: e.eval_faltantes > 0 ? 'resultados' : 'recomendaciones', pendiente_resultados: e.eval_faltantes > 0 ? 'resultados' : 'recomendaciones',
   pendiente_dictamen: 'dictamen', requiere_repeticion: 'dictamen', aprobada: 'cierre', rechazada: 'cierre',
   cerrada_aprobada: 'fin', cerrada_rechazada: 'fin', cancelada: 'registro' }[estado] || 'registro');
@@ -44,7 +44,7 @@ async function renderLista(params) {
   root.innerHTML = `
     <section class="page-intro">
       <div><span class="eyebrow">Seguimiento</span><h1>Pruebas industriales</h1>
-        <p>Registro → Registro en proceso → Evaluaciones complementarias → Resultados → Recomendaciones → Dictamen → Cierre.</p></div>
+        <p>Registro → En proceso → Evaluaciones complementarias → Resultados → Recomendaciones → Dictamen → Cierre.</p></div>
       <div class="page-actions">${btn('data-pl="csv"', 'download', 'Exportar CSV')}<button class="btn primary" data-pl="nueva">${icon('flask-conical')} Nueva prueba industrial</button></div>
     </section>
     <div class="card">
@@ -52,7 +52,7 @@ async function renderLista(params) {
         <div class="search">${icon('search')}<input type="search" id="pl-q" placeholder="Folio, cambio, receta, materia prima o equipo" aria-label="Buscar"></div>
         <select id="pl-tipo" aria-label="Tipo"><option value="">Todos los tipos</option>${tipos.map((t) => `<option value="${esc(t.codigo)}">${esc(t.nombre)}</option>`).join('')}</select>
         <select id="pl-estado" aria-label="Estado"><option value="abiertas">Abiertas</option><option value="">Todos los estados</option>
-          ${Object.entries(ESTADOS_PRUEBA).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('')}</select>
+          ${Object.entries(ESTADOS_PRUEBA).filter(([k]) => !['en_preparacion', 'preparada'].includes(k)).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('')}</select>
         <select id="pl-resp" aria-label="Responsable"><option value="">Cualquier responsable</option><option value="yo">Yo</option>${usuarios.map((u) => `<option value="${esc(u.id)}">${esc(u.nombre)}</option>`).join('')}</select>
         <select id="pl-prio" aria-label="Prioridad"><option value="">Cualquier prioridad</option>${Object.entries(PRIORIDADES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select>
         <span class="date-range"><input type="date" id="pl-desde" aria-label="Registrada desde"> a <input type="date" id="pl-hasta" aria-label="Registrada hasta"></span>
@@ -115,7 +115,7 @@ async function renderLista(params) {
   await apply();
 }
 
-function etapasMini(p) {
+export function etapasMini(p) {
   const et = etapasDe(p.tipo);
   const cur = etapaDe(p.estado, { eval_faltantes: 1 });
   const n = cur === 'fin' ? et.length : et.findIndex(([k]) => k === cur);
@@ -283,6 +283,7 @@ export async function openRegistro(p = null) {
       };
       if (p) { mustRow(await sb.from('pruebas_prubind').update(payload).eq('id', p.id).select('id')); toast('Registro actualizado.', 'success'); return true; }
       const { data } = must(await sb.from('pruebas_prubind').insert({ ...payload, tipo: v.tipo, registrado_por: state.profile.id }).select('id, folio').single());
+      avisar('nueva_prueba', data.id);
       // Parámetros del área de quien registra y, si aplica, copia de la receta para la formulación
       try {
         if (params.ids.length) must(await sb.rpc('prubind_definir_parametros', { p_prueba: data.id, p_agregar: params.ids, p_quitar: [] }));
@@ -357,16 +358,23 @@ function pintar() {
 // Qué falta y a quién le corresponde
 function siguientePaso() {
   const e = P.estado;
-  // Áreas involucradas cuyo responsable (usted) aún no define sus parámetros
-  const porDefinir = (E.areas_involucradas || []).filter((a) => !(E.areas || []).includes(a) && autoridad(P.tipo, `evaluar_${a}`));
-  const proceso = porDefinir.length
-    ? [`Definir los parámetros de ${porDefinir.map((a) => AREAS[a].label).join(' y ')} (pestaña Registro → Parámetros a evaluar).`, true]
-    : ['Registrar durante el proceso los parámetros de su área y, al terminar, pasar a resultados.', puedeEn(P, 'ejecutar')];
+  // Áreas cuyo responsable (usted) aún no define sus parámetros ni indicó que no tiene nada que evaluar
+  const sinPar = E.sin_parametros || [];
+  const porDefinir = AREAS_ORDEN.filter((a) => !(E.areas || []).includes(a) && !sinPar.includes(a) && autoridad(P.tipo, `evaluar_${a}`));
+  const definir = porDefinir.length
+    ? [`Definir los parámetros de ${porDefinir.map((a) => AREAS[a].label).join(' y ')} o indicar que su área no tiene nada que evaluar (pestaña Registro).`, true] : null;
+  const registro = puedeEn(P, 'preparar')
+    ? ['Iniciar la prueba cuando esté lista. Las áreas que aún no definen sus parámetros pueden agregarlos durante la prueba.', true]
+    : definir || [`Esperando a que ${P.registrado_por_nombre || 'quien registró la prueba'} la inicie.`, false];
+  const misAreas = AREAS_ORDEN.filter((a) => autoridad(P.tipo, `evaluar_${a}`) || autoridad(P.tipo, `capturar_${a}`));
+  const proceso = definir || [misAreas.length
+    ? 'Registrar los parámetros de su área (para toda la prueba o por batch). Cuando su área termine puede evaluar y dar su veredicto, sin esperar a las demás.'
+    : 'Cada área registra sus parámetros, los evalúa y da su veredicto. Al terminar, quien registró la prueba la da por terminada.', misAreas.length > 0 || puedeEn(P, 'preparar')];
   const evalua = E.eval_faltantes > 0
-    ? [`Cada área evalúa sus parámetros: Cumple o No cumple, con observaciones si no cumple (${E.eval_faltantes} por evaluar).`, puedeEn(P, 'evaluar')]
-    : [`Cada área registra su recomendación (${E.recom_faltantes} pendiente(s)) y se envía a dictamen.`, puedeEn(P, 'evaluar')];
+    ? [`Cada área evalúa sus parámetros: Cumple, No cumple o No se pudo determinar (${E.eval_faltantes} por evaluar).`, puedeEn(P, 'evaluar')]
+    : [`Cada área que participó da su veredicto y recomendación (${E.recom_faltantes} pendiente(s)); después pasa sola a dictamen.`, puedeEn(P, 'evaluar')];
   const msgs = {
-    registrada: proceso, en_preparacion: proceso, preparada: proceso, en_ejecucion: proceso,
+    registrada: definir && !puedeEn(P, 'preparar') ? definir : registro, en_preparacion: registro, preparada: registro, en_ejecucion: proceso,
     en_evaluacion: evalua, pendiente_resultados: evalua,
     pendiente_dictamen: ['Alta Dirección revisa los resultados y las recomendaciones, y emite el dictamen.', autoridad(P.tipo, 'dictaminar')],
     requiere_repeticion: ['Iniciar una nueva ejecución vinculada a este registro.', puedeEn(P, 'preparar') || autoridad(P.tipo, 'dictaminar')],
@@ -381,7 +389,8 @@ function siguientePaso() {
 function accionesHTML() {
   const e = P.estado, b = [];
   const B = (a, ico, t, cls = 'secondary') => b.push(`<button class="btn ${cls}" data-pa="${a}">${icon(ico)} ${esc(t)}</button>`);
-  if (['registrada', 'en_preparacion', 'preparada'].includes(e) && puedeEn(P, 'preparar')) B('editar', 'pencil', 'Editar registro');
+  if (['registrada', 'en_preparacion', 'preparada'].includes(e) && puedeEn(P, 'preparar')) { B('iniciar', 'play', 'Iniciar prueba', 'primary btn-iniciar'); B('editar', 'pencil', 'Editar registro'); }
+  if (e === 'en_ejecucion' && (puedeEn(P, 'preparar') || puedeEn(P, 'ejecutar'))) B('terminar', 'flag', 'Terminar prueba');
   if (e === 'requiere_repeticion' && (puedeEn(P, 'preparar') || autoridad(P.tipo, 'dictaminar'))) B('nueva_ejecucion', 'repeat', 'Iniciar nueva ejecución', 'primary');
   b.push(`<button class="btn secondary" data-pa="imprimir">${icon('printer')} Expediente</button>`);
   if (!CERRADAS.includes(e) && puedeEn(P, 'cancelar')) B('cancelar', 'ban', 'Cancelar prueba', 'ghost danger-text');
@@ -441,6 +450,19 @@ async function onClick(e) {
   try {
     switch (a.dataset.pa) {
       case 'editar': if (await openRegistro(P)) refrescar(); return;
+      case 'iniciar': {
+        const sinPar = E.sin_parametros || [];
+        const lineas = AREAS_ORDEN.map((a) => `<li>${icon(AREAS[a].ico)} <b>${esc(AREAS[a].label)}:</b> ${(E.areas || []).includes(a) ? 'parámetros definidos'
+          : sinPar.includes(a) ? 'sin nada que evaluar' : 'aún sin parámetros (puede agregarlos durante la prueba)'}</li>`).join('');
+        if (!await confirmDialog({ title: `Iniciar ${P.folio}`, html: `<p>La prueba pasará a <b>En proceso</b> y se avisará a las áreas para que registren sus parámetros.</p><ul class="ini-areas">${lineas}</ul>`, confirmText: 'Iniciar prueba' })) return;
+        await accion(P.id, 'iniciar'); toast('Prueba iniciada: las áreas ya pueden registrar sus parámetros.', 'success'); refrescar('proceso'); return;
+      }
+      case 'terminar': {
+        if (!await confirmDialog({ title: `Terminar ${P.folio}`, message: 'Ya no se agregarán batches. Las áreas que registraron datos completan su evaluación y su veredicto (los análisis de laboratorio pendientes se pueden completar después); las que no registraron nada no participan.', confirmText: 'Terminar prueba' })) return;
+        const est = await accion(P.id, 'terminar_ejecucion');
+        toast(est === 'pendiente_dictamen' ? 'Prueba terminada: todas las áreas ya habían evaluado, pasó al dictamen.' : 'Prueba terminada: continúa la evaluación por área.', 'success');
+        refrescar(est === 'pendiente_dictamen' ? 'dictamen' : 'resultados'); return;
+      }
       case 'nueva_ejecucion':
         if (!await confirmDialog({ title: 'Nueva ejecución', message: `Se abrirá la ejecución #${P.ejecucion_actual + 1} vinculada a ${P.folio}, con los mismos parámetros a evaluar. El historial anterior se conserva.`, confirmText: 'Iniciar' })) return;
         await accion(P.id, 'nueva_ejecucion'); toast('Nueva ejecución abierta.', 'success'); refrescar('proceso'); return;

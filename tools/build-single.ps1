@@ -1,6 +1,7 @@
 ﻿# Genera la versión de UN SOLO ARCHIVO para publicar:
 #   index.html            (en la raíz del repositorio: lo que publica Vercel; todo incluido)
 #   apple-touch-icon.png  (ícono de iPhone/iPad; iOS exige que sea un archivo aparte)
+#   sw.js, manifest.webmanifest, icon-512.png, notif-badge.png y notif-icon.png (notificaciones push)
 #   version.json          (la app lo consulta y ofrece "Actualizar" si cambia APP_VERSION)
 # a partir del código fuente en public/. Calcula los hashes de la Content-Security-Policy.
 # Uso: powershell -ExecutionPolicy Bypass -File tools\build-single.ps1
@@ -59,33 +60,24 @@ if ($css.Contains('/img/')) { throw 'Quedó una referencia a /img/ en el CSS' }
 $themeJs = (Read-Text('js/theme-init.js')).Trim()
 $configJs = (Read-Text('js/config.js')).Trim()
 
-# Manifiesto (Android) generado en el navegador con rutas absolutas del dominio donde se publique.
-# iPhone no lo necesita: usa apple-touch-icon.png y las etiquetas apple-mobile-web-app-*.
+# Manifiesto como archivo aparte (las notificaciones en iPhone lo exigen al instalar la app).
+# Sus íconos apuntan a archivos publicados en la raíz.
 $m = Get-Content (Join-Path $Src 'manifest.webmanifest') -Raw -Encoding UTF8 | ConvertFrom-Json
-$icon192 = 'data:image/png;base64,' + (B64 'icons/icon-192.png')
-$manifestJs = @"
-(function () {
-  try {
-    var o = location.origin;
-    var m = { id: o + '/', name: $(ConvertTo-Json $m.name), short_name: $(ConvertTo-Json $m.short_name), description: $(ConvertTo-Json $m.description),
-      lang: 'es-MX', start_url: o + '/', scope: o + '/', display: 'standalone', background_color: '$($m.background_color)', theme_color: '$($m.theme_color)',
-      icons: [{ src: o + '/apple-touch-icon.png', sizes: '180x180', type: 'image/png', purpose: 'any' },
-              { src: '$icon192', sizes: '192x192', type: 'image/png', purpose: 'any' }] };
-    var l = document.createElement('link'); l.rel = 'manifest';
-    l.href = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(JSON.stringify(m));
-    document.head.appendChild(l);
-  } catch (e) { /* sin manifiesto: la instalación en iOS no lo requiere */ }
-})();
-"@.Replace("`r`n", "`n").Trim()
+$m.icons = @(
+  [ordered]@{ src = '/apple-touch-icon.png'; sizes = '180x180'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/notif-icon.png'; sizes = '192x192'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/icon-512.png'; sizes = '512x512'; type = 'image/png'; purpose = 'any' }
+)
+$manifestJson = $m | ConvertTo-Json -Depth 5
 
 function Sha([string]$t) { 'sha256-' + [Convert]::ToBase64String([Security.Cryptography.SHA256]::Create().ComputeHash($utf8.GetBytes($t))) }
 $supa = ([regex]::Match($configJs, 'https://[a-z0-9-]+\.supabase\.co')).Value
 if (-not $supa) { throw 'No se encontró SUPABASE_URL en config.js' }
 $wss = $supa.Replace('https://', 'wss://')
-$csp = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net '$(Sha $themeJs)' '$(Sha $manifestJs)' '$(Sha $configJs)' '$(Sha $bundleJs)'; " +
+$csp = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net '$(Sha $themeJs)' '$(Sha $configJs)' '$(Sha $bundleJs)'; " +
        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; " +
        "img-src 'self' data: blob: $supa; connect-src 'self' $supa $wss; " +
-       "manifest-src 'self' data:; base-uri 'self'; form-action 'self'; object-src 'none'"
+       "manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
 $icon128 = 'data:image/png;base64,' + (B64 'img/app-icon-128.png')
 $fav32 = 'data:image/png;base64,' + (B64 'icons/favicon-32.png')
 
@@ -97,18 +89,25 @@ function Swap([string]$find, [string]$repl) {
 }
 Swap '  <link rel="icon" href="/favicon.ico?v=1" sizes="any">' "  <meta http-equiv=`"Content-Security-Policy`" content=`"$csp`">`n  <link rel=`"icon`" type=`"image/png`" sizes=`"32x32`" href=`"$fav32`">"
 Swap "  <link rel=`"icon`" type=`"image/png`" sizes=`"32x32`" href=`"/icons/favicon-32.png?v=1`">`n" ''
-Swap '  <link rel="manifest" href="/manifest.webmanifest?v=1">' "  <script>$manifestJs</script>"
+Swap '  <link rel="manifest" href="/manifest.webmanifest?v=1">' '  <link rel="manifest" href="/manifest.webmanifest">'
 Swap '<img class="app-icon" src="/img/app-icon-128.png"' "<img class=`"app-icon`" src=`"$icon128`""
 Swap "  <link rel=`"stylesheet`" href=`"/css/app.css?v=2.0.0`">`n  <link rel=`"stylesheet`" href=`"/css/prubind.css?v=2.0.0`">" "  <style>`n$css</style>"
 Swap '  <script src="/js/theme-init.js"></script>' "  <script>$themeJs</script>"
 Swap '  <script src="/js/config.js?v=2.0.0"></script>' "  <script>$configJs</script>"
 Swap '  <script type="module" src="/js/app.js?v=2.0.0"></script>' "  <script>$bundleJs</script>"
-foreach ($ref in @('/css/', '/js/', '/img/', '/icons/', 'favicon.ico', 'manifest.webmanifest')) {
+foreach ($ref in @('/css/', '/js/', '/img/', '/icons/', 'favicon.ico')) {
   if ($html.Contains($ref)) { throw "Quedó una referencia externa a $ref" }
 }
 $html = "<!-- Pruebas industriales · Pet's Table — archivo generado por tools/build-single.ps1. Edita las fuentes en public/ y vuelve a generar. -->`n" + $html
 [IO.File]::WriteAllText((Join-Path $Out 'index.html'), $html, $utf8)
 Copy-Item (Join-Path $Src 'apple-touch-icon.png') (Join-Path $Out 'apple-touch-icon.png') -Force
+# Archivos que no pueden ir dentro del HTML: service worker (avisos push), manifiesto e íconos de los avisos
+Copy-Item (Join-Path $Src 'sw.js') (Join-Path $Out 'sw.js') -Force
+[IO.File]::WriteAllText((Join-Path $Out 'manifest.webmanifest'), $manifestJson + "`n", $utf8)
+Copy-Item (Join-Path $Src 'icons/icon-512.png') (Join-Path $Out 'icon-512.png') -Force
+# Insignia monocromática (barra de estado de Android) e ícono grande de respaldo
+Copy-Item (Join-Path $Src 'img/notif-badge.png') (Join-Path $Out 'notif-badge.png') -Force
+Copy-Item (Join-Path $Src 'img/notif-icon.png') (Join-Path $Out 'notif-icon.png') -Force
 if ($configJs -notmatch 'APP_VERSION:\s*"([^"]+)"') { throw 'No se encontró APP_VERSION en config.js' }
 [IO.File]::WriteAllText((Join-Path $Out 'version.json'), "{`"version`":`"$($Matches[1])`"}`n", $utf8)
-Get-Item (@('index.html', 'apple-touch-icon.png', 'version.json') | ForEach-Object { Join-Path $Out $_ }) | ForEach-Object { '{0,-24} {1,10:N0} bytes' -f $_.Name, $_.Length }
+Get-Item (@('index.html', 'apple-touch-icon.png', 'sw.js', 'manifest.webmanifest', 'version.json', 'icon-512.png', 'notif-badge.png', 'notif-icon.png') | ForEach-Object { Join-Path $Out $_ }) | ForEach-Object { '{0,-24} {1,10:N0} bytes' -f $_.Name, $_.Length }

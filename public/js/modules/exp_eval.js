@@ -1,22 +1,21 @@
 // =====================================================================
-// Etapa 4 · Resultados por parámetro y etapa 5 · Recomendaciones.
-// Se consolida lo registrado: parámetro, resultado obtenido, criterio y
-// evaluación Cumple / No cumple. "Cumple" queda "Sin observaciones" de
-// forma predeterminada; "No cumple" exige explicar por qué.
-// Cada área evalúa lo suyo: Calidad → Jefe de Calidad; Producción →
-// Gerente de Producción; Seguridad → Supervisor de Seguridad, Salud y
-// Ambiente; Mantenimiento → Jefe de Mantenimiento. Después cada área
-// registra su recomendación y la prueba pasa al dictamen de Alta Dirección.
+// Etapa 4 · Resultados por parámetro y etapa 5 · Veredicto y
+// recomendaciones por área.
+// Cada área es independiente: evalúa lo suyo (✓ Cumple, ✗ No cumple o
+// ? No se pudo determinar) y da su veredicto (satisfactoria / no
+// satisfactoria) en cuanto termina, aunque la prueba siga en proceso.
+// Lo que no tiene resultado (p. ej. bromatológicos de laboratorio) no
+// detiene la evaluación. La prueba pasa sola al dictamen de Alta Dirección
+// cuando termina y todas las áreas que participaron dieron su veredicto.
 // =====================================================================
 import {
   sb, state, esc, icon, toast, errMsg, must, mustRow, getCat, unidadTxt, fmtDateTime, pill, puedeArea,
-  AREAS, AREAS_ORDEN, AREAS_OBLIGATORIAS, COMPLEMENTARIAS, OPCIONES_TXT, refreshIcons,
+  AREAS, AREAS_ORDEN, COMPLEMENTARIAS, OPCIONES_TXT, EVALUACION, VEREDICTO, refreshIcons,
 } from '../core.js';
-import { cardHead, aviso, vacio, checklist, accion, criterioTxt } from './exp_comun.js';
+import { aviso, vacio, checklist, accion, criterioTxt } from './exp_comun.js';
 
-const EVALUA = ['en_evaluacion', 'pendiente_resultados'];
-export const EVAL = { cumple: ['Cumple', 'ok'], no_cumple: ['No cumple', 'bad'] };
-export const SENTIDO = { favorable: ['Favorable', 'ok', 'Recomienda implementar el cambio'], no_favorable: ['No favorable', 'bad', 'No recomienda implementar el cambio'], repetir: ['Repetir prueba', 'warn', 'Recomienda repetir o ajustar la prueba'] };
+const EVALUA = ['en_ejecucion', 'en_evaluacion', 'pendiente_resultados'];
+const TERMINADA = ['en_evaluacion', 'pendiente_resultados'];
 
 // Consolidado de la ejecución actual: filas a evaluar por área
 export async function consolidarResultados(P, ej = P.ejecucion_actual) {
@@ -38,23 +37,30 @@ export async function consolidarResultados(P, ej = P.ejecucion_actual) {
     const valores = R.map((r) => {
       const v = r.valor_opcion ? (OPCIONES_TXT[r.valor_opcion] || r.valor_opcion) : `${r.valor_num}${r.unidad ? ` ${r.unidad}` : ''}`;
       const donde = `${r.batch_numero ? `${P.ejecucion_form === 'fabricacion' ? 'Batch' : 'Corrida'} ${r.batch_numero}` : 'General'}${r.dilucion ? ` · ${r.dilucion}` : ''}`;
-      return { txt: donde ? `${donde}: ${v}` : v, fuera: r.estado === 'no_conforme', just: r.justificacion };
+      return { txt: `${donde}: ${v}`, fuera: r.estado === 'no_conforme', just: r.justificacion };
     });
-    filas.push({ key: `pl:${pl.id}`, plan_id: pl.id, area: m.area, compl: COMPLEMENTARIAS.includes(m.categoria), nombre: m.nombre,
+    filas.push({ key: `pl:${pl.id}`, plan_id: pl.id, area: m.area, compl: COMPLEMENTARIAS.includes(m.categoria), lab: m.categoria === 'bromatologia', nombre: m.nombre,
       criterio: criterioTxt(pl, unidadTxt(unidades, m.unidad_id)), ref: pl.crit_referencia, valores, conValor: R.length > 0,
-      requerida: pl.obligatorio || R.length > 0, ev: ev.data.find((x) => x.plan_id === pl.id) });
+      ev: ev.data.find((x) => x.plan_id === pl.id) });
   });
   pars.data.forEach((x) => {
     const c = ctrl.data.find((k) => k.prueba_parametro_id === x.id);
-    filas.push({ key: `par:${x.id}`, prueba_parametro_id: x.id, area: 'produccion', compl: false, nombre: `${x.nombre} (${P.equipo_nombre || 'equipo'})`,
+    filas.push({ key: `par:${x.id}`, prueba_parametro_id: x.id, area: 'produccion', compl: false, lab: false, nombre: `${x.nombre} (${P.equipo_nombre || 'equipo'})`,
       criterio: x.minimo != null || x.maximo != null ? criterioTxt({ crit_minimo: x.minimo, crit_maximo: x.maximo }, unidadTxt(unidades, x.unidad_id)) : (x.referencia || '').split(' · ')[0],
       valores: c?.valor != null ? [{ txt: `${c.valor} ${unidadTxt(unidades, x.unidad_id)}`.trim(), fuera: c.resultado === 'no_conforme', just: c.observaciones }] : [],
-      conValor: c?.valor != null, requerida: true, ev: ev.data.find((k) => k.prueba_parametro_id === x.id) });
+      conValor: c?.valor != null, ev: ev.data.find((k) => k.prueba_parametro_id === x.id) });
   });
   const areas = AREAS_ORDEN.filter((a) => filas.some((f) => f.area === a));
-  const faltan = (a) => filas.filter((f) => f.area === a && f.requerida && !f.ev).length;
-  return { filas, areas, faltan, REC: rec.data };
+  // Por evaluar: lo que tiene resultado y aún no se evalúa
+  const faltan = (a) => filas.filter((f) => f.area === a && f.conValor && !f.ev).length;
+  // Participa el área con algún dato o alguna evaluación
+  const participa = (a) => filas.some((f) => f.area === a && (f.conValor || f.ev));
+  return { filas, areas, faltan, participa, REC: rec.data };
 }
+
+// Conteo ✓ ✗ ? de un área
+const conteo = (fs) => Object.keys(EVALUACION).map((k) => [k, fs.filter((f) => f.ev?.evaluacion === k).length]);
+const resumenEval = (fs) => `<span class="ev-sum">${conteo(fs).map(([k, n]) => `<span class="ev-n ${EVALUACION[k][1]}" title="${esc(EVALUACION[k][0])}">${icon(EVALUACION[k][2])} ${n}</span>`).join('')}</span>`;
 
 // ============================== RESULTADOS ==============================
 export async function etapaResultados(pane, ctx) {
@@ -62,49 +68,63 @@ export async function etapaResultados(pane, ctx) {
   const K = await consolidarResultados(P);
   const enEval = EVALUA.includes(P.estado);
   const puedeEv = (a) => enEval && puedeArea(P, 'evaluar', a);
-  const previo = ['registrada', 'en_preparacion', 'preparada', 'en_ejecucion'].includes(P.estado);
+  const antes = ['registrada', 'en_preparacion', 'preparada'].includes(P.estado);
 
   const valoresHTML = (f) => (f.valores.length ? f.valores.map((v) => `<div class="${v.fuera ? 'bad-txt' : ''}">${esc(v.txt)}${v.fuera ? ` ${icon('alert-triangle')}` : ''}${v.just ? `<div class="cell-sub">${esc(v.just)}</div>` : ''}</div>`).join('')
-    : '<span class="cell-sub">Sin resultado</span>');
-  const fila = (f) => {
-    const edit = puedeEv(f.area) && f.conValor;
-    const sel = f.ev?.evaluacion;
-    return `<tr class="${sel === 'no_cumple' ? 'row-bad' : ''}" data-fila="${esc(f.key)}">
-      <td data-label="Parámetro"><div class="td-in"><div class="cell-main">${esc(f.nombre)}</div></div></td>
-      <td data-label="Resultado"><div class="td-in">${valoresHTML(f)}</div></td>
-      <td data-label="Criterio"><div class="td-in">${f.criterio ? esc(f.criterio) : '<span class="cell-sub">—</span>'}${f.ref ? `<div class="cell-sub">${esc(f.ref)}</div>` : ''}</div></td>
-      <td data-label="Evaluación"><div class="td-in">${edit ? `<div class="seg sm" role="radiogroup" aria-label="Evaluación de ${esc(f.nombre)}">
-          <label class="seg-opt ok"><input type="radio" name="ev_${esc(f.key)}" value="cumple" ${sel === 'cumple' ? 'checked' : ''}><span>Cumple</span></label>
-          <label class="seg-opt bad"><input type="radio" name="ev_${esc(f.key)}" value="no_cumple" ${sel === 'no_cumple' ? 'checked' : ''}><span>No cumple</span></label></div>`
-        : sel ? pill(...EVAL[sel]) : `<span class="cell-sub">${f.conValor ? 'Por evaluar' : f.requerida ? 'Falta el resultado' : 'Opcional'}</span>`}</div></td>
-      <td data-label="Observaciones"><div class="td-in">${edit ? `<input name="ob_${esc(f.key)}" maxlength="500" value="${esc(f.ev && f.ev.observaciones !== 'Sin observaciones' ? f.ev.observaciones : '')}" placeholder="Sin observaciones" aria-label="Observaciones de ${esc(f.nombre)}">`
-        : f.ev ? `${esc(f.ev.observaciones)}<div class="cell-sub">${esc(f.ev.por?.nombre || '')} · ${fmtDateTime(f.ev.updated_at)}</div>` : ''}</div></td></tr>`;
+    : f.lab ? `<span class="lab-pend">${icon('hourglass')} Pendiente de laboratorio</span>` : '<span class="cell-sub">Sin resultado</span>');
+  const opcion = (f, k, habil) => {
+    const [l, cls, ic] = EVALUACION[k];
+    return `<label class="ev-opt ${cls} ${habil ? '' : 'off'}" title="${esc(l)}"><input type="radio" name="ev_${esc(f.key)}" value="${k}" ${f.ev?.evaluacion === k ? 'checked' : ''} ${habil ? '' : 'disabled'}>
+      <span class="ev-btn" aria-hidden="true">${icon(ic)}</span><span class="sr-only">${esc(l)}</span></label>`;
   };
-  const tabla = (fs) => `<div class="table-wrap responsive"><table class="table res-table"><thead><tr><th>Parámetro</th><th>Resultado</th><th>Criterio</th><th>Evaluación</th><th>Observaciones</th></tr></thead>
-    <tbody>${fs.map(fila).join('')}</tbody></table></div>`;
+  const fila = (f) => {
+    const edit = puedeEv(f.area);
+    const sel = f.ev?.evaluacion;
+    const obs = f.ev && f.ev.observaciones !== 'Sin observaciones' ? f.ev.observaciones : '';
+    return `<div class="ev-row ${sel ? `is-${sel}` : ''}" data-fila="${esc(f.key)}">
+      <div class="ev-param"><b>${esc(f.nombre)}</b>${f.criterio ? `<span>Criterio: ${esc(f.criterio)}${f.ref ? ` · ${esc(f.ref)}` : ''}</span>` : '<span>Sin criterio cargado</span>'}</div>
+      <div class="ev-val">${valoresHTML(f)}</div>
+      <div class="ev-pick">${edit ? `<div class="ev-opts" role="radiogroup" aria-label="Evaluación de ${esc(f.nombre)}">${opcion(f, 'cumple', f.conValor)}${opcion(f, 'no_cumple', f.conValor)}${opcion(f, 'no_determinado', true)}</div>`
+        : sel ? pill(EVALUACION[sel][0], EVALUACION[sel][1]) : `<span class="cell-sub">${f.conValor ? 'Por evaluar' : '—'}</span>`}</div>
+      <div class="ev-obs">${edit ? `<input name="ob_${esc(f.key)}" maxlength="500" value="${esc(obs)}" placeholder="${sel === 'no_cumple' || sel === 'no_determinado' ? 'Explique brevemente *' : 'Observaciones (opcional)'}" aria-label="Observaciones de ${esc(f.nombre)}">`
+        : f.ev ? `${esc(f.ev.observaciones)}<div class="cell-sub">${esc(f.ev.por?.nombre || '')} · ${fmtDateTime(f.ev.updated_at)}</div>` : ''}</div>
+    </div>`;
+  };
+  const lista = (fs) => `<div class="ev-list"><div class="ev-row ev-headrow" aria-hidden="true"><div>Parámetro</div><div>Resultado</div><div>Evaluación</div><div>Observaciones</div></div>${fs.map(fila).join('')}</div>`;
 
-  pane.innerHTML = `${previo ? aviso('Los resultados se evalúan cuando termina el registro durante el proceso. Mientras tanto, aquí se ve lo registrado hasta ahora.') : ''}
+  pane.innerHTML = `${antes ? aviso('Los resultados se evalúan cuando la prueba ya inició y el área tiene datos registrados.', '', 'circle-play') : ''}
+    ${P.estado === 'en_ejecucion' ? aviso('La prueba sigue en proceso. Cada área puede evaluar lo que ya registró sin esperar a las demás.', 'info', 'zap') : ''}
+    <div class="ev-legend">${Object.values(EVALUACION).map(([l, cls, ic]) => `<span class="ev-n ${cls}">${icon(ic)} ${esc(l)}</span>`).join('')}</div>
     ${K.areas.length ? '' : `<div class="card">${vacio('La prueba no tiene parámetros a evaluar.')}</div>`}
     ${K.areas.map((a) => {
       const fs = K.filas.filter((f) => f.area === a); const proc = fs.filter((f) => !f.compl), compl = fs.filter((f) => f.compl);
-      const total = fs.filter((f) => f.requerida).length; const falta = K.faltan(a);
-      return `<form class="card mt area-eval" data-area="${a}" novalidate>
-        ${cardHead(`${AREAS[a].label}`, `${total - falta} de ${total} evaluados${AREAS_OBLIGATORIAS.includes(a) ? '' : ' · si no se evalúa, la prueba sigue avanzando'}`,
-          puedeEv(a) && fs.some((f) => f.conValor && !f.ev) ? `<button type="button" class="btn ghost sm" data-re="todo-cumple">${icon('check-check')} Marcar pendientes como Cumple</button>` : '')}
-        ${proc.length ? tabla(proc) : ''}
-        ${compl.length ? `<div class="section-title">${icon('microscope')} Evaluaciones complementarias</div>${tabla(compl)}` : ''}
+      const conDato = fs.filter((f) => f.conValor).length; const evaluados = fs.filter((f) => f.ev).length; const falta = K.faltan(a);
+      const sinDatos = !K.participa(a);
+      return `<form class="card mt area-eval g-${a}" data-area="${a}" novalidate>
+        <div class="card-head"><div class="ae-title"><span class="ar-ico">${icon(AREAS[a].ico)}</span><div><h3>${esc(AREAS[a].label)}</h3>
+          <p>${sinDatos ? 'Aún sin datos registrados' : `${evaluados} evaluado(s) · ${conDato} con resultado${falta ? ` · <b>${falta} por evaluar</b>` : ''}`}</p></div></div>
+          <div class="head-btns">${resumenEval(fs)}${puedeEv(a) && fs.some((f) => f.conValor && !f.ev) ? `<button type="button" class="btn ghost sm" data-re="todo-cumple">${icon('check-check')} Pendientes como Cumple</button>` : ''}</div></div>
+        ${proc.length ? lista(proc) : ''}
+        ${compl.length ? `<div class="section-title">${icon('microscope')} Evaluaciones complementarias</div>${lista(compl)}` : ''}
         ${puedeEv(a) ? `<div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn primary">${icon('save')} Guardar evaluación de ${esc(AREAS[a].label)}</button></div>`
           : enEval && falta ? aviso(`Lo evalúa el responsable de ${esc(AREAS[a].label)}.`) : ''}
       </form>`;
     }).join('')}`;
   refreshIcons();
 
+  // Al elegir ✗ o ?, la observación pasa a ser obligatoria
+  pane.addEventListener('change', (e) => {
+    const r = e.target.closest('.ev-opt input'); if (!r) return;
+    const row = r.closest('.ev-row'); row.className = `ev-row is-${r.value}`;
+    const ob = row.querySelector('.ev-obs input');
+    if (ob) { ob.placeholder = r.value === 'cumple' ? 'Observaciones (opcional)' : 'Explique brevemente *'; if (r.value !== 'cumple' && !ob.value) ob.focus(); }
+  });
   pane.addEventListener('click', (e) => {
     const b = e.target.closest('[data-re="todo-cumple"]');
     if (!b) return;
-    b.closest('form').querySelectorAll('tr[data-fila]').forEach((tr) => {
-      const radios = tr.querySelectorAll('input[type=radio]');
-      if (radios.length && ![...radios].some((r) => r.checked)) radios[0].checked = true;
+    b.closest('form').querySelectorAll('.ev-row[data-fila]').forEach((row) => {
+      const radios = row.querySelectorAll('input[type=radio]:not([disabled])');
+      if (radios.length && ![...radios].some((r) => r.checked) && radios[0].value === 'cumple') { radios[0].checked = true; row.className = 'ev-row is-cumple'; }
     });
   });
   pane.addEventListener('submit', async (e) => {
@@ -113,16 +133,16 @@ export async function etapaResultados(pane, ctx) {
     const btnG = form.querySelector('button[type=submit]');
     err.textContent = '';
     const cambios = [];
-    for (const f of K.filas.filter((x) => x.area === area && x.conValor)) {
-      const evv = form.querySelector(`input[name="ev_${f.key}"]:checked`)?.value;
+    for (const f of K.filas.filter((x) => x.area === area)) {
+      const evv = form.querySelector(`input[name="ev_${CSS.escape(f.key)}"]:checked`)?.value;
       if (!evv) continue;
       const obsIn = form.elements[`ob_${f.key}`]; const obs = obsIn?.value.trim() || '';
-      if (evv === 'no_cumple' && !obs) { err.textContent = `Explique por qué "${f.nombre}" no cumple.`; obsIn?.focus(); return; }
+      if (evv !== 'cumple' && !obs) { err.textContent = `Explique por qué "${f.nombre}" ${evv === 'no_cumple' ? 'no cumple' : 'no se pudo determinar'}.`; obsIn?.focus(); return; }
       const payload = { evaluacion: evv, observaciones: obs || 'Sin observaciones' };
       if (f.ev) { if (f.ev.evaluacion !== evv || f.ev.observaciones !== payload.observaciones) cambios.push(['upd', f.ev.id, payload]); }
       else cambios.push(['ins', null, { ...payload, prueba_id: P.id, area, plan_id: f.plan_id || null, prueba_parametro_id: f.prueba_parametro_id || null, evaluado_por: state.profile.id }]);
     }
-    if (!cambios.length) { err.textContent = 'Marque Cumple o No cumple en los parámetros que va a evaluar.'; return; }
+    if (!cambios.length) { err.textContent = 'Marque ✓, ✗ o ? en los parámetros que va a evaluar.'; return; }
     btnG.disabled = true;
     try {
       for (const [t, id, payload] of cambios) {
@@ -136,50 +156,58 @@ export async function etapaResultados(pane, ctx) {
   });
 }
 
-// ============================== RECOMENDACIONES ==============================
+// ============================== VEREDICTO Y RECOMENDACIONES ==============================
 export async function etapaRecomendaciones(pane, ctx) {
   const { P } = ctx;
   const K = await consolidarResultados(P);
   const enEval = EVALUA.includes(P.estado);
-  const lista = K.areas.map((a) => [!!K.REC.find((r) => r.area === a), AREAS_OBLIGATORIAS.includes(a) ? AREAS[a].label : `${AREAS[a].label} (no detiene la prueba)`]);
-  const completo = AREAS_OBLIGATORIAS.filter((a) => K.areas.includes(a)).every((a) => K.faltan(a) === 0 && K.REC.some((r) => r.area === a)) && K.areas.some((a) => AREAS_OBLIGATORIAS.includes(a));
+  const part = K.areas.filter((a) => K.participa(a));
+  const noPart = AREAS_ORDEN.filter((a) => !part.includes(a));
+  const listo = (a) => K.faltan(a) === 0 && K.REC.some((r) => r.area === a);
+  const completo = part.length > 0 && part.every(listo);
 
   const tarjeta = (a) => {
     const r = K.REC.find((x) => x.area === a); const falta = K.faltan(a);
-    const nc = K.filas.filter((f) => f.area === a && f.ev?.evaluacion === 'no_cumple');
+    const fs = K.filas.filter((f) => f.area === a);
+    const nc = fs.filter((f) => f.ev?.evaluacion === 'no_cumple');
     const puede = enEval && puedeArea(P, 'evaluar', a);
-    const nOk = K.filas.filter((f) => f.area === a && f.ev?.evaluacion === 'cumple').length;
-    const resumen = `<p class="hint">${nOk} ${nOk === 1 ? 'cumple' : 'cumplen'} · <span class="${nc.length ? 'bad-txt' : ''}">${nc.length} no ${nc.length === 1 ? 'cumple' : 'cumplen'}</span>${nc.length ? `: ${nc.map((f) => esc(f.nombre)).join(', ')}` : ''}</p>`;
+    const resumen = `<div class="ver-sum">${resumenEval(fs)}${nc.length ? `<span class="bad-txt">No cumple: ${nc.map((f) => esc(f.nombre)).join(', ')}</span>` : ''}</div>`;
     let cuerpo;
     if (puede && falta === 0) {
+      const ops = ['favorable', 'no_favorable'].concat(r?.sentido === 'repetir' ? ['repetir'] : []);
       cuerpo = `<form class="rec-form" data-area="${a}" novalidate>
-        <div class="field"><span class="label">Recomendación del área <span class="req">*</span></span>
-          <div class="radio-cards multi">${Object.entries(SENTIDO).map(([k, [l, , d]]) => `<label><input type="radio" name="sentido" value="${k}" ${r?.sentido === k ? 'checked' : ''}><span>${esc(l)}<small>${esc(d)}</small></span></label>`).join('')}</div></div>
+        <span class="label">Por parte de ${esc(AREAS[a].label)}, la prueba es: <span class="req">*</span></span>
+        <div class="verdict-opts">${ops.map((k) => { const [l, cls, ic, d] = VEREDICTO[k];
+          return `<label class="verdict ${cls}"><input type="radio" name="sentido" value="${k}" ${r?.sentido === k ? 'checked' : ''}><span class="vd-ico">${icon(ic)}</span><span class="vd-txt"><b>${esc(l)}</b><small>${esc(d)}</small></span></label>`; }).join('')}</div>
         <div class="field"><label for="rec-${a}">Recomendaciones y acciones derivadas <span class="req">*</span></label>
           <textarea id="rec-${a}" name="texto" rows="3" maxlength="1000" data-counter placeholder="Qué recomienda el área de acuerdo con los resultados obtenidos">${esc(r?.recomendacion || '')}</textarea></div>
-        <div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn primary">${icon('save')} ${r ? 'Actualizar' : 'Guardar'} recomendación</button></div></form>`;
+        <div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn primary">${icon('save')} ${r ? 'Actualizar' : 'Guardar'} veredicto</button></div></form>`;
     } else if (r) {
-      cuerpo = `<div>${pill(SENTIDO[r.sentido][0], SENTIDO[r.sentido][1])} <span class="cell-sub">${esc(r.por?.nombre || '')} · ${fmtDateTime(r.updated_at)}</span></div><p class="pre">${esc(r.recomendacion)}</p>`;
+      const [l, cls, ic] = VEREDICTO[r.sentido];
+      cuerpo = `<div class="verdict-done ${cls}"><span class="vd-ico">${icon(ic)}</span><div><b>${esc(l)}</b><span>${esc(r.por?.nombre || '')} · ${fmtDateTime(r.updated_at)}</span></div></div><p class="pre">${esc(r.recomendacion)}</p>`;
     } else if (falta) {
       cuerpo = aviso(`Primero se evalúan los resultados del área (${falta} por evaluar).`, '', 'list-checks');
-    } else cuerpo = vacio(`Pendiente: la registra el responsable de ${AREAS[a].label}.${AREAS_OBLIGATORIAS.includes(a) ? "" : " Si no la registra, la prueba sigue avanzando."}`);
-    return `<div class="card mt"><div class="card-head"><div><h3>${icon(AREAS[a].ico)} ${esc(AREAS[a].label)}</h3><p>${esc(AREAS[a].desc)}</p></div>${r ? pill('Registrada', 'ok') : AREAS_OBLIGATORIAS.includes(a) ? pill('Pendiente', 'warn') : pill('Sin registrar', 'gray')}</div>
-      ${resumen}${cuerpo}</div>`;
+    } else cuerpo = vacio(`Pendiente: lo registra el responsable de ${AREAS[a].label}.`);
+    return `<div class="card mt g-${a}"><div class="card-head"><div class="ae-title"><span class="ar-ico">${icon(AREAS[a].ico)}</span><div><h3>${esc(AREAS[a].label)}</h3><p>${esc(AREAS[a].desc)}</p></div></div>
+      ${r ? pill(VEREDICTO[r.sentido][0], VEREDICTO[r.sentido][1]) : pill('Pendiente', 'warn')}</div>${resumen}${cuerpo}</div>`;
   };
 
-  pane.innerHTML = `${['registrada', 'en_preparacion', 'preparada', 'en_ejecucion'].includes(P.estado) ? aviso('Las recomendaciones se registran después de evaluar los resultados.') : ''}
+  pane.innerHTML = `${['registrada', 'en_preparacion', 'preparada'].includes(P.estado) ? aviso('El veredicto de cada área se registra cuando el área ya evaluó sus resultados.', '', 'circle-play') : ''}
     <div class="grid grid-main">
-      <div>${K.areas.map(tarjeta).join('') || `<div class="card">${vacio('Sin áreas participantes.')}</div>`}</div>
-      <div class="card"><div class="card-head"><div><h3>Para pasar a dictamen</h3><p>Cuando todas las áreas registran su recomendación, la prueba pasa sola al dictamen de Alta Dirección.</p></div></div>
-        ${checklist(lista)}
-        ${enEval && completo ? `<button class="btn primary block mt" data-rc="enviar">${icon('send')} Enviar a dictamen</button>` : ''}
+      <div>${part.map(tarjeta).join('') || `<div class="card">${vacio('Ninguna área ha registrado datos todavía.')}</div>`}
+        ${noPart.length ? `<div class="card mt no-part"><div class="card-head"><div>${P.estado === 'en_ejecucion' ? '<h3>Áreas sin datos todavía</h3><p>Participan si registran algún dato durante la prueba.</p>'
+          : '<h3>Áreas que no participaron</h3><p>No registraron datos en la prueba: se considera que no requirieron participar.</p>'}</div></div>
+          <div class="chips">${noPart.map((a) => `<span class="chip">${icon(AREAS[a].ico)} ${esc(AREAS[a].label)}</span>`).join('')}</div></div>` : ''}</div>
+      <div class="card"><div class="card-head"><div><h3>Para pasar a dictamen</h3><p>${P.estado === 'en_ejecucion' ? 'Cuando la prueba termine y todas las áreas que participaron den su veredicto, pasa sola al dictamen de Alta Dirección.' : 'Cuando todas las áreas que participaron dan su veredicto, la prueba pasa sola al dictamen de Alta Dirección.'}</p></div></div>
+        ${checklist([...(P.estado === 'en_ejecucion' ? [[false, 'Prueba terminada']] : []), ...part.map((a) => [listo(a), `Veredicto de ${AREAS[a].label}`])])}
+        ${TERMINADA.includes(P.estado) && completo ? `<button class="btn primary block mt" data-rc="enviar">${icon('send')} Enviar a dictamen</button>` : ''}
       </div>
     </div>`;
   refreshIcons();
 
   const enviar = async (auto) => {
     await accion(P.id, 'enviar_dictamen');
-    toast(auto ? 'Todas las áreas registraron su recomendación: la prueba pasó al dictamen de Alta Dirección.' : 'Prueba enviada a dictamen.', 'success');
+    toast(auto ? 'Todas las áreas que participaron dieron su veredicto: la prueba pasó al dictamen de Alta Dirección.' : 'Prueba enviada a dictamen.', 'success');
     ctx.refrescar('dictamen');
   };
   pane.addEventListener('click', async (e) => {
@@ -190,17 +218,19 @@ export async function etapaRecomendaciones(pane, ctx) {
     e.preventDefault();
     const form = e.target; const area = form.dataset.area; const err = form.querySelector('.form-error');
     const sentido = form.querySelector('input[name=sentido]:checked')?.value; const texto = form.elements.texto.value.trim();
-    if (!sentido) { err.textContent = 'Elija si la recomendación es favorable, no favorable o repetir.'; return; }
+    if (!sentido) { err.textContent = 'Elija si por parte de su área la prueba es satisfactoria o no satisfactoria.'; return; }
     if (texto.length < 3) { err.textContent = 'Escriba la recomendación del área.'; form.elements.texto.focus(); return; }
     const btnG = form.querySelector('button[type=submit]'); btnG.disabled = true;
     try {
       const r = K.REC.find((x) => x.area === area);
       if (r) mustRow(await sb.from('recomendaciones_prubind').update({ sentido, recomendacion: texto }).eq('id', r.id).select('id'));
       else must(await sb.from('recomendaciones_prubind').insert({ prueba_id: P.id, area, sentido, recomendacion: texto, emitido_por: state.profile.id }));
-      toast(`Recomendación de ${AREAS[area].label} guardada.`, 'success');
-      // Si ya están todas, pasa sola al dictamen
-      const { data } = must(await sb.rpc('prubind_eval_estado', { p_prueba: P.id }));
-      if (data.eval_faltantes === 0 && data.recom_faltantes === 0) { try { await enviar(true); return; } catch { /* se puede enviar manualmente */ } }
+      toast(`Veredicto de ${AREAS[area].label} guardado.`, 'success');
+      // Si la prueba ya terminó y están todas, pasa sola al dictamen
+      if (TERMINADA.includes(P.estado)) {
+        const { data } = must(await sb.rpc('prubind_eval_estado', { p_prueba: P.id }));
+        if (data.eval_faltantes === 0 && data.recom_faltantes === 0) { try { await enviar(true); return; } catch { /* se puede enviar manualmente */ } }
+      }
       ctx.refrescar('recomendaciones');
     } catch (ex) { err.textContent = errMsg(ex); btnG.disabled = false; }
   });

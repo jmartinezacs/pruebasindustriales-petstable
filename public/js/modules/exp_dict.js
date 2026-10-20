@@ -6,10 +6,10 @@
 // =====================================================================
 import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, getCat, invalidateCat, opciones, fmtDateTime,
-  pill, estadoPill, autoridad, AREAS, AREAS_OBLIGATORIAS, refreshIcons,
+  pill, estadoPill, autoridad, AREAS, AREAS_ORDEN, EVALUACION, VEREDICTO, refreshIcons,
 } from '../core.js';
 import { box, txt, cardHead, btn, aviso, vacio, checklist, accion } from './exp_comun.js';
-import { consolidarResultados, EVAL, SENTIDO } from './exp_eval.js';
+import { consolidarResultados } from './exp_eval.js';
 
 const DICT = { aprobada: ['Aprobada', 'ok'], rechazada: ['Rechazada', 'bad'], requiere_repeticion: ['Requiere repetición', 'warn'], pendiente_resultados: ['Pendiente de resultados', 'warn'] };
 
@@ -34,7 +34,10 @@ function resumenHTML(P, K, ej) {
   const B = K.B.filter((b) => b.ejecucion === ej), L = K.L.filter((l) => l.ejecucion === ej), C = K.C.filter((c) => c.ejecucion === ej);
   const { filas, areas, REC } = K.RES;
   const nc = filas.filter((f) => f.ev?.evaluacion === 'no_cumple');
-  const sinEval = filas.filter((f) => f.requerida && !f.ev);
+  const sinEval = filas.filter((f) => f.conValor && !f.ev);
+  const lab = filas.filter((f) => !f.conValor && !f.ev);
+  const nd = filas.filter((f) => f.ev?.evaluacion === 'no_determinado');
+  const part = areas.filter((a) => filas.some((f) => f.area === a && (f.conValor || f.ev)));
   return `
     <div class="detail-grid">
       ${box('Objetivo', esc(P.objetivo_desc || P.objetivo_nombre || '—'), true)}
@@ -43,12 +46,14 @@ function resumenHTML(P, K, ej) {
       ${box(P.ejecucion_form === 'fabricacion' ? 'Lotes diarios y batches' : 'Corrida', P.ejecucion_form === 'fabricacion'
         ? (L.map((l) => `${esc(l.codigo)}: ${B.filter((b) => b.lote_diario_id === l.id).map((b) => `#${b.numero}${b.resultado_op === 'no_conforme' ? ' (con desviación)' : ''}`).join(', ')}`).join('<br>') || '—')
         : `${C.length} parámetro(s) del equipo registrados`)}
-      ${box('Resultados por área', areas.map((a) => { const fs = filas.filter((f) => f.area === a && f.ev); const n = fs.filter((f) => f.ev.evaluacion === 'no_cumple').length;
-        return `${esc(AREAS[a].label)}: <b class="ok-txt">${fs.length - n} ${fs.length - n === 1 ? 'cumple' : 'cumplen'}</b>${n ? ` · <b class="bad-txt">${n} no ${n === 1 ? 'cumple' : 'cumplen'}</b>` : ''}`; }).join('<br>') || '—', true)}
-      ${box('Parámetros que no cumplen', nc.length ? nc.map((f) => `<div class="nc-line"><b>${esc(f.nombre)}</b> (${esc(AREAS[f.area].label)})${f.criterio ? ` · criterio ${esc(f.criterio)}` : ''}<br><span class="cell-sub">${f.valores.map((v) => esc(v.txt)).join(' · ')}</span><br>${esc(f.ev.observaciones)}</div>`).join('') : '<span class="ok-txt">Todos cumplen</span>', true)}
+      ${box('Resultados por área', part.map((a) => { const fs = filas.filter((f) => f.area === a && f.ev); const n = fs.filter((f) => f.ev.evaluacion === 'no_cumple').length; const d = fs.filter((f) => f.ev.evaluacion === 'no_determinado').length;
+        return `${esc(AREAS[a].label)}: <b class="ok-txt">${fs.length - n - d} ${fs.length - n - d === 1 ? 'cumple' : 'cumplen'}</b>${n ? ` · <b class="bad-txt">${n} no ${n === 1 ? 'cumple' : 'cumplen'}</b>` : ''}${d ? ` · <b class="warn-txt">${d} no se pudo determinar</b>` : ''}`; }).join('<br>') || '—', true)}
+      ${nd.length ? box('No se pudo determinar', nd.map((f) => `<div class="nc-line"><b>${esc(f.nombre)}</b> (${esc(AREAS[f.area].label)}): ${esc(f.ev.observaciones)}</div>`).join(''), true) : ''}
+      ${lab.length ? box('Sin resultado (pendiente de laboratorio u otros)', lab.map((f) => esc(f.nombre)).join(', '), true) : ''}
+      ${box('Parámetros que no cumplen', nc.length ? nc.map((f) => `<div class="nc-line"><b>${esc(f.nombre)}</b> (${esc(AREAS[f.area].label)})${f.criterio ? ` · criterio ${esc(f.criterio)}` : ''}<br><span class="cell-sub">${f.valores.map((v) => esc(v.txt)).join(' · ')}</span><br>${esc(f.ev.observaciones)}</div>`).join('') : '<span class="ok-txt">Ninguno</span>', true)}
       ${sinEval.length ? box('Sin evaluar', sinEval.map((f) => esc(f.nombre)).join(', '), true) : ''}
-      ${box('Recomendaciones de las áreas', areas.map((a) => { const r = REC.find((x) => x.area === a);
-        return `<div class="nc-line"><b>${esc(AREAS[a].label)}</b>: ${r ? `${pill(SENTIDO[r.sentido][0], SENTIDO[r.sentido][1])} ${esc(r.recomendacion)} <span class="cell-sub">· ${esc(r.por?.nombre || '')}</span>` : AREAS_OBLIGATORIAS.includes(a) ? '<span class="warn-txt">Pendiente</span>' : '<span class="cell-sub">No registró su parte</span>'}</div>`; }).join('') || '—', true)}
+      ${box('Veredicto y recomendaciones de las áreas', AREAS_ORDEN.map((a) => { const r = REC.find((x) => x.area === a);
+        return `<div class="nc-line"><b>${esc(AREAS[a].label)}</b>: ${r ? `${pill(VEREDICTO[r.sentido][0], VEREDICTO[r.sentido][1])} ${esc(r.recomendacion)} <span class="cell-sub">· ${esc(r.por?.nombre || '')}</span>` : part.includes(a) ? '<span class="warn-txt">Pendiente</span>' : '<span class="cell-sub">No participó (no registró datos)</span>'}</div>`; }).join('') || '—', true)}
       ${box('Evidencia adjunta', K.ADJ.length ? `${K.ADJ.length} archivo(s): ${K.ADJ.slice(0, 6).map((a) => esc(a.tipo?.nombre || a.nombre)).join(', ')}${K.ADJ.length > 6 ? '…' : ''}` : '<span class="cell-sub">Sin evidencia adjunta</span>', true)}
     </div>`;
 }
@@ -56,13 +61,13 @@ function resumenHTML(P, K, ej) {
 export async function etapaDictamen(pane, ctx) {
   const { P, E } = ctx;
   if (['registrada', 'en_preparacion', 'preparada', 'en_ejecucion', 'en_evaluacion', 'pendiente_resultados'].includes(P.estado) && !P.ultimo_dictamen) {
-    pane.innerHTML = aviso('Alta Dirección emite el dictamen cuando todas las áreas evaluaron sus resultados y registraron su recomendación.'); refreshIcons(); return;
+    pane.innerHTML = aviso('Alta Dirección emite el dictamen cuando la prueba termina y las áreas que participaron evaluaron sus resultados y dieron su veredicto.'); refreshIcons(); return;
   }
   const K = await consolidado(P);
   const puedeDict = P.estado === 'pendiente_dictamen' && autoridad(P.tipo, 'dictaminar');
   const bloqueos = [
-    [E.eval_faltantes === 0, 'Resultados evaluados por todas las áreas'],
-    [E.recom_faltantes === 0, 'Recomendaciones de todas las áreas'],
+    [E.eval_faltantes === 0, 'Resultados registrados evaluados por cada área'],
+    [E.recom_faltantes === 0, 'Veredicto de las áreas que participaron'],
   ];
   pane.innerHTML = `
     <div class="grid grid-main">
@@ -208,9 +213,9 @@ function imprimir(P, K, E) {
         || '<tr><td colspan="5">Corrida de prueba (sin batches)</td></tr>'}</table>
     <h2>3–4. Resultados por parámetro</h2><table class="t"><tr><th>Área</th><th>Parámetro</th><th>Resultado</th><th>Criterio</th><th>Evaluación</th><th>Observaciones</th></tr>
       ${filas.map((f) => `<tr><td>${esc(AREAS[f.area].label)}</td><td>${esc(f.nombre)}</td><td>${f.valores.map((v) => esc(v.txt)).join('<br>') || '—'}</td><td>${esc(f.criterio || '—')}</td>
-        <td>${f.ev ? esc(EVAL[f.ev.evaluacion][0]) : '—'}</td><td>${f.ev ? `${esc(f.ev.observaciones)}<br><span class="muted">${esc(f.ev.por?.nombre || '')}</span>` : ''}</td></tr>`).join('')}</table>
+        <td>${f.ev ? esc(EVALUACION[f.ev.evaluacion][0]) : '—'}</td><td>${f.ev ? `${esc(f.ev.observaciones)}<br><span class="muted">${esc(f.ev.por?.nombre || '')}</span>` : ''}</td></tr>`).join('')}</table>
     <h2>5. Recomendaciones</h2><table class="t"><tr><th>Área</th><th>Sentido</th><th>Recomendación</th><th>Responsable</th></tr>
-      ${areas.map((a) => { const r = REC.find((x) => x.area === a); return `<tr><td>${esc(AREAS[a].label)}</td><td>${r ? esc(SENTIDO[r.sentido][0]) : 'Pendiente'}</td><td>${esc(r?.recomendacion || '')}</td><td>${esc(r?.por?.nombre || '')}</td></tr>`; }).join('')}</table>
+      ${areas.map((a) => { const r = REC.find((x) => x.area === a); return `<tr><td>${esc(AREAS[a].label)}</td><td>${r ? esc(VEREDICTO[r.sentido][0]) : 'Sin veredicto (no participó o pendiente)'}</td><td>${esc(r?.recomendacion || '')}</td><td>${esc(r?.por?.nombre || '')}</td></tr>`; }).join('')}</table>
     <h2>6. Dictamen de Alta Dirección y cierre</h2><table>${fila('Dictamen', ult ? esc(`${DICT[ult.dictamen][0]} · ${ult.por?.nombre || ''} · ${fmtDateTime(ult.created_at)}${ult.motivo ? ` · ${ult.motivo.nombre}` : ''}${ult.descripcion ? ` · ${ult.descripcion}` : ''}`) : '—')}
       ${fila('Cierre', P.cerrada_at ? esc(`${P.cerrada_por_nombre} · ${fmtDateTime(P.cerrada_at)}`) : '—')}
       ${fila('Autorización de implementación', K.A.filter((a) => a.tipo === 'implementacion').map((a) => esc(`${a.puesto?.nombre || ''}: ${a.por?.nombre} · ${fmtDateTime(a.created_at)}`)).join('<br>') || '—')}

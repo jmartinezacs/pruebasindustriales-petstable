@@ -1,0 +1,38 @@
+{
+    "id":  "/",
+    "name":  "Pruebas industriales · Pet\u0027s Table",
+    "short_name":  "Pruebas industriales",
+    "description":  "Calidad de producto - Pet\u0027s Table S.A. de C.V.: registro y seguimiento de pruebas industriales.",
+    "lang":  "es-MX",
+    "dir":  "ltr",
+    "start_url":  "/",
+    "scope":  "/",
+    "display":  "standalone",
+    "orientation":  "any",
+    "background_color":  "#090D12",
+    "theme_color":  "#F58020",
+    "categories":  [
+                       "business",
+                       "productivity"
+                   ],
+    "icons":  [
+                  {
+                      "src":  "/apple-touch-icon.png",
+                      "sizes":  "180x180",
+                      "type":  "image/png",
+                      "purpose":  "any"
+                  },
+                  {
+                      "src":  "/notif-icon.png",
+                      "sizes":  "192x192",
+                      "type":  "image/png",
+                      "purpose":  "any"
+                  },
+                  {
+                      "src":  "/icon-512.png",
+                      "sizes":  "512x512",
+                      "type":  "image/png",
+                      "purpose":  "any"
+                  }
+              ]
+}

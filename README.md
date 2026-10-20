@@ -324,3 +324,15 @@ Según la narración del usuario: **Registro → Registro en proceso → Evaluac
 - **Vistas retiradas del menú:** «Batches ejecutados»; en Catálogos: Lotes de materia prima, Equipos y maquinaria, Parámetros de operación (los datos se conservan).
 - **Panel:** indicadores sin «(hoy)» y con colores nuevos; gráficas con etiquetas de datos (situación, etapas, tipos, Cumple/No cumple por área). Título de la pestaña fijo: «Pruebas industriales».
 - Migración `20261020001700_prubind_v42_areas_fijas_y_registro_flexible.sql`.
+
+## v5.0 · Inicio de la prueba, áreas independientes y notificaciones (20/10/2026)
+
+Migración `20261020001800_prubind_v5_inicio_areas_avisos.sql`; prueba SQL `tests/sql/pruebas_flujo_v5.sql` (15 verificaciones).
+
+- **Iniciar prueba:** quien registra la prueba la inicia con un botón; antes de iniciar no se registran datos. Puede iniciarla aunque alguna área no haya definido sus parámetros (se pueden agregar durante la prueba). Estado "En proceso" (antes "Registro en proceso"). Quien la registró también la termina.
+- **Nada que evaluar por mi área:** cada responsable puede indicarlo en Registro → Parámetros a evaluar (tabla `areas_sin_parametros_prubind`, RPC `prubind_area_sin_parametros`); puede retomarla mientras la prueba no termine.
+- **Áreas independientes:** participa el área que registra algún dato. Cada una evalúa (✓ Cumple, ✗ No cumple, ? No se pudo determinar) y da su veredicto (Satisfactoria / No satisfactoria) con su recomendación, incluso con la prueba en proceso. El dictamen espera solo a las áreas que participaron; si al terminar ya todas dieron su veredicto, pasa sola a dictamen.
+- **Laboratorio pendiente:** los parámetros sin resultado (p. ej. bromatológicos) no detienen la evaluación ni el veredicto; se pueden marcar "No se pudo determinar" con explicación.
+- **Notificaciones push** (mismo diseño que Servicio Médico: foto de quien genera el aviso con la insignia de la app): Edge Function `notificar_prubind`, `public/sw.js`, tablas `push_subs_prubind` y `avisos_prubind`, claves VAPID en `prubind_private.config_push`. Eventos: prueba registrada, prueba iniciada (áreas con autoridad de registrar o evaluar), lista para dictamen (Alta Dirección) y dictamen emitido (quien registró y las áreas). Se activan en Mi perfil o en el aviso del Panel; en iPhone requiere la app instalada.
+- **Publicación:** además de `index.html`, la raíz publica `sw.js`, `manifest.webmanifest`, `icon-512.png`, `notif-icon.png` y `notif-badge.png`.
+- **Panel:** "Requieren tu intervención" en tarjetas por prueba con lo que te toca (filtrables), gráficas con un color por barra o porción y etiquetas de datos, y actividad reciente como línea de tiempo por día.

@@ -3,7 +3,7 @@
 // =====================================================================
 import {
   sb, state, esc, icon, toast, openModal, checkForm, nullIfEmpty, must, getCat, opciones,
-  ADJ_MAX_MB, ADJ_ACCEPT, rutaAdjunto,
+  ADJ_MAX_MB, ADJ_ACCEPT, rutaAdjunto, avisar,
 } from '../core.js';
 
 export const box = (l, v, full = false) => `<div class="info-box ${full ? 'full' : ''}"><small>${esc(l)}</small><div>${v}</div></div>`;
@@ -22,9 +22,13 @@ export const vacio = (t) => `<p class="hint" style="margin:6px 0">${esc(t)}</p>`
 export const checklist = (items) => `<ul class="checklist">${items.map(([ok, t]) =>
   `<li class="${ok ? 'ok' : 'no'}">${icon(ok ? 'check-circle-2' : 'circle-dashed')}<span>${esc(t)}</span></li>`).join('')}</ul>`;
 
-// Ejecuta una acción del flujo (RPC)
+// Ejecuta una acción del flujo (RPC) y avisa a quien corresponda; devuelve el estado nuevo
 export async function accion(pid, nombre, datos = {}) {
-  must(await sb.rpc('prubind_accion', { p_prueba: pid, p_accion: nombre, p_datos: datos }));
+  const estado = must(await sb.rpc('prubind_accion', { p_prueba: pid, p_accion: nombre, p_datos: datos })).data?.estado;
+  if (nombre === 'iniciar') avisar('iniciada', pid);
+  else if (nombre === 'dictaminar') avisar('dictamen', pid);
+  else if (estado === 'pendiente_dictamen' && ['enviar_dictamen', 'terminar_ejecucion'].includes(nombre)) avisar('lista_dictamen', pid);
+  return estado;
 }
 
 // Subir evidencia ligada a la prueba (y opcionalmente a un resultado o batch)

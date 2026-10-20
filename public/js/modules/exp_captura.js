@@ -82,7 +82,7 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
   const motDesv = motivos.filter((m) => m.tipo === 'desviacion');
 
   // Permisos: cada área captura lo suyo durante el proceso; los resultados se pueden completar hasta la evaluación
-  const abierta = ABIERTA.includes(P.estado);
+  const abierta = P.estado === 'en_ejecucion';
   const enCaptura = abierta || COMPLETAR.includes(P.estado);
   const capArea = (area) => enCaptura && (puedeArea(P, 'capturar', area) || puedeArea(P, 'evaluar', area) || P.responsable_ejecucion_id === state.profile.id);
   const ejecuta = abierta && puedeEn(P, 'ejecutar');            // alta de batches y datos generales del batch
@@ -162,9 +162,10 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
   const titulo = unidad === 'batch' ? (batch ? `${noun} #${batch.numero}` : `Nuevo ${noun.toLowerCase()}`) : unidad === 'punto' ? `Punto: ${punto.nombre}` : 'Toda la prueba (registro general)';
   return openModal({
     title: `${titulo}${seccion === 'complementarias' && unidad === 'batch' ? ' · complementarias' : ''}`, subtitle: `${P.folio} · ${P.cambio}`, size: 'lg', submitText: puedeAlgo ? 'Guardar' : 'Cerrar',
-    body: `<p class="unit-hint">${icon(unidad === "batch" ? "package" : "layers")} ${unidad === "batch" ? `Valores medidos en este ${fab ? "batch" : "corrida"}. Lo que se mide una sola vez para toda la prueba se registra en «Toda la prueba».` : `Valores de toda la prueba (por ejemplo, merma total o condiciones de seguridad). Lo que se mide por ${fab ? "batch" : "corrida"} se registra en cada uno.`}</p>${!puedeAlgo ? aviso('Solo consulta: cada área registra sus propios parámetros.') : editables.length < items.length ? `<p class="hint">Usted registra los parámetros de su área; los demás se muestran como consulta.</p>` : ''}
+    body: `<div class="unit-banner ${unidad === 'batch' ? 'is-batch' : 'is-general'}"><span class="ub-ico">${icon(unidad === 'batch' ? 'package' : 'layers')}</span>
+        <div><small>Registrando en</small><b>${esc(titulo)}</b><span>${unidad === 'batch' ? `Valores medidos en este ${fab ? 'batch' : 'corrida'}. Lo que se mide una sola vez va en «Toda la prueba».` : `Lo que se mide una sola vez (merma total, condiciones de seguridad…). Lo que se mide por ${fab ? 'batch' : 'corrida'} se registra en cada uno.`}</span></div></div>${!puedeAlgo ? aviso('Solo consulta: cada área registra sus propios parámetros.') : editables.length < items.length ? `<p class="hint">Usted registra los parámetros de su área; los demás se muestran como consulta.</p>` : ''}
       <div class="form-grid">${cabecera}${equipoHTML}
-      ${secciones.map((k) => `<div class="form-section">${tituloSec(k)}${k === 'microbiologia' ? ` ${ayuda('Capture cada dilución leída en UFC/g. Puede dejar en blanco lo que aún no tenga lectura y completarlo después.')}` : ''}</div>
+      ${secciones.map((k) => `<div class="form-section">${tituloSec(k)}${k === 'microbiologia' ? ` ${ayuda('Capture cada dilución leída en UFC/g. Puede dejar en blanco lo que aún no tenga lectura y completarlo después.')}` : ''}${k === 'bromatologia' ? ` <span class="sec-note">${icon('hourglass')} Puede quedar pendiente de laboratorio</span>` : ''}</div>
         <div class="cap-grid">${grupos[k].map(campo).join('')}</div>`).join('')}
       ${!secciones.length && !equipoHTML ? '<p class="hint full">No hay parámetros para registrar en esta sección.</p>' : ''}
       ${nuevo ? '<label class="check full"><input type="checkbox" name="siguiente" checked> Al guardar, capturar el siguiente batch</label>' : ''}

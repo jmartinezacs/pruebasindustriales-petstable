@@ -1,3 +1,5 @@
+-- NOTA (v5.0): reglas anteriores. Desde v5 la prueba se inicia con "Iniciar prueba" antes de registrar datos
+-- y participan solo las áreas que registran; las reglas vigentes se prueban en pruebas_flujo_v5.sql.
 -- =====================================================================
 -- Pruebas del flujo por áreas (v4) con los usuarios y puestos reales.
 -- Todo se REVIERTE. Ejecutar completo en Supabase → SQL Editor; el

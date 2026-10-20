@@ -1,21 +1,24 @@
 // =====================================================================
-// Etapa 2 · Registro durante el proceso y etapa 3 · Evaluaciones
-// complementarias. No se planea el número de batches: cada parámetro se
-// registra para TODA LA PRUEBA (registro general) o POR BATCH, y quien
-// captura agrega los batches conforme se producen. Por lo general los
-// inspectores registran por batch y los supervisores para toda la prueba.
-// Cada área solo edita sus propios parámetros.
+// Etapa 2 · En proceso y etapa 3 · Evaluaciones complementarias.
+// La prueba se registra solo después de que quien la registró la INICIA.
+// Cada parámetro se registra para TODA LA PRUEBA (registro general) o POR
+// BATCH; quien captura agrega los batches conforme se producen. Por lo
+// general los inspectores registran por batch y los supervisores para toda
+// la prueba. Cada área solo edita sus propios parámetros y participa si
+// registra algún dato.
 // =====================================================================
 import {
-  sb, state, esc, icon, toast, errMsg, confirmDialog, mustRow, getCat, fmtDateTime, pill, puedeEn, puedeArea,
+  sb, state, esc, icon, toast, errMsg, confirmDialog, mustRow, getCat, fmtDateTime, fmtDate, todayISO, pill, puedeEn, puedeArea,
   AREAS, AREAS_ORDEN, COMPLEMENTARIAS, TIPOS_COMPLEMENTARIAS, refreshIcons,
 } from '../core.js';
-import { cardHead, btn, iconBtn, aviso, vacio, checklist, accion, subirEvidencia } from './exp_comun.js';
-import { capturaForm, itemsDe, ABIERTA } from './exp_captura.js';
+import { iconBtn, aviso, vacio, subirEvidencia } from './exp_comun.js';
+import { capturaForm, itemsDe } from './exp_captura.js';
 
 const OP = { pendiente: ['Pendiente', 'warn'], conforme: ['Sin problemas', 'ok'], no_conforme: ['Con desviación', 'bad'] };
 const COMPLETAR = ['en_evaluacion', 'pendiente_resultados'];
+const ANTES = ['registrada', 'en_preparacion', 'preparada'];
 const NOM_CAT = { sensorial: 'Sensorial', microbiologia: 'Microbiología', bromatologia: 'Bromatológicos' };
+const ICO_CAT = { sensorial: 'eye', microbiologia: 'microscope', bromatologia: 'flask-round' };
 
 async function cargarDatos(P, ej) {
   const [metodos, batches, plan, muestras, resultados] = await Promise.all([
@@ -39,63 +42,110 @@ const puedeCapturarAlgo = (P, areas) => areas.some((a) => puedeArea(P, 'capturar
 const selEjecucion = (P, ej) => (P.ejecucion_actual > 1 ? `<label class="inline-sel">Ejecución <select id="ej-sel" data-native>${Array.from({ length: P.ejecucion_actual }, (_, i) => i + 1)
   .map((n) => `<option value="${n}" ${n === ej ? 'selected' : ''}>#${n}${n === P.ejecucion_actual ? ' (actual)' : ''}</option>`).join('')}</select></label>` : '');
 
-// Fila de una unidad de registro con el avance por grupo (área o categoría)
-function filaUnidad({ ico, titulo, sub, grupos, items, R, attrs, puede, extra = '' }) {
-  return `<div class="unit-row">
-    <span class="pend-ico">${icon(ico)}</span>
-    <div class="li-main"><b>${titulo}</b><span>${sub}</span>
-      <div class="unit-chips">${grupos.map(([k, label, pred]) => { const xs = items.filter(pred); const n = conDato(xs, R);
-        return xs.length ? `<span class="chip ${n ? 'on' : ''}">${esc(label)} <b>${n}</b>/${xs.length}</span>` : ''; }).join('')}</div></div>
-    <div class="row-actions">${btn(attrs, puede ? 'clipboard-pen' : 'eye', puede ? 'Registrar' : 'Ver', puede ? 'primary sm' : 'secondary sm')}${extra}</div></div>`;
+// Avance de un grupo (área o categoría) dentro de una unidad: barra fina con su color
+const barras = (grupos, items, R) => grupos.map(([k, label, pred]) => {
+  const xs = items.filter(pred); if (!xs.length) return '';
+  const n = conDato(xs, R);
+  return `<div class="ut-bar g-${k}" title="${esc(label)}: ${n} de ${xs.length} con dato"><span>${esc(label)}</span><i><b style="width:${Math.round((n / xs.length) * 100)}%"></b></i><em>${n}/${xs.length}</em></div>`;
+}).join('');
+
+// Mosaico de una unidad de registro (toda la prueba o un batch)
+function mosaico({ ico, titulo, sub, grupos, items, R, attrs, puede, cls = '', extra = '' }) {
+  const n = conDato(items, R);
+  return `<div class="unit-tile ${cls} ${n ? 'con-datos' : ''}">
+    <button type="button" class="ut-main" ${attrs} aria-label="${puede ? 'Registrar en' : 'Ver'} ${esc(titulo)}">
+      <span class="ut-ico">${icon(ico)}</span>
+      <span class="ut-txt"><b>${esc(titulo)}</b><small>${sub}</small></span>
+      <span class="ut-go">${icon(puede ? 'clipboard-pen' : 'eye')}<span>${puede ? 'Registrar' : 'Ver'}</span></span>
+    </button>
+    <div class="ut-bars">${barras(grupos, items, R)}</div>
+    ${extra ? `<div class="ut-extra">${extra}</div>` : ''}
+  </div>`;
 }
 
-// ============================== REGISTRO EN PROCESO ==============================
+// Situación de cada área en la prueba
+function estadoAreas(P, E, items, D) {
+  const sinPar = E.sin_parametros || [], part = E.participantes || [];
+  const vencida = P.fecha_planeada && P.fecha_planeada < todayISO();
+  return AREAS_ORDEN.map((a) => {
+    const xs = items.filter((pl) => D.met(pl.metodo_id)?.area === a); const n = conDato(xs, D.R);
+    let est;
+    if (sinPar.includes(a)) est = [pill('Nada que evaluar', 'gray'), 'Indicó que no participa en esta prueba'];
+    else if (part.includes(a) || n) est = [pill('Participa', 'ok'), `${n} de ${xs.length} parámetro(s) con dato`];
+    else if (!xs.length) est = [pill('Sin parámetros', 'warn'), 'Puede agregarlos durante la prueba'];
+    else est = [pill(vencida ? 'Sin registros' : 'Esperando datos', vencida ? 'gray' : 'warn'),
+      vencida ? `No registró nada el ${fmtDate(P.fecha_planeada)}: se considera que no requirió participar` : `${xs.length} parámetro(s) por registrar`];
+    return `<div class="area-row g-${a}"><span class="ar-ico">${icon(AREAS[a].ico)}</span><div class="li-main"><b>${esc(AREAS[a].label)}</b><span>${est[1]}</span></div>${est[0]}</div>`;
+  }).join('');
+}
+
+// ============================== EN PROCESO ==============================
 export async function etapaProceso(pane, ctx) {
-  const { P } = ctx;
+  const { P, E } = ctx;
   const ej = ctx.ejecucion || P.ejecucion_actual;
   const actual = ej === P.ejecucion_actual;
   const fab = P.ejecucion_form === 'fabricacion';
-  const noun = fab ? 'batch' : 'corrida';
+  const noun = fab ? 'batch' : 'corrida', Noun = fab ? 'Batch' : 'Corrida';
+
+  // Antes de iniciar: no se registra nada todavía
+  if (actual && ANTES.includes(P.estado)) {
+    const inicia = puedeEn(P, 'preparar');
+    pane.innerHTML = `<div class="card start-card">
+      <span class="start-ico">${icon('circle-play')}</span>
+      <h3>La prueba aún no inicia</h3>
+      <p>${inicia ? 'Cuando la prueba esté lista, iníciela: se avisará a las áreas para que registren sus parámetros. Las áreas que aún no los definen pueden agregarlos durante la prueba.'
+        : `${esc(P.registrado_por_nombre || 'Quien registró la prueba')} la iniciará. Mientras tanto, cada área puede definir sus parámetros en la pestaña Registro.`}</p>
+      ${inicia ? `<button class="btn primary lg" data-pa="iniciar">${icon('play')} Iniciar prueba</button>` : `<button class="btn secondary" data-tab="registro">${icon('list-checks')} Ver parámetros a evaluar</button>`}
+    </div>`;
+    refreshIcons(); return;
+  }
+
   const D = await cargarDatos(P, ej);
-  const abierta = actual && ABIERTA.includes(P.estado);
-  const enCaptura = actual && (abierta || COMPLETAR.includes(P.estado));
-  const altaBatch = abierta && puedeEn(P, 'ejecutar');
+  const enProceso = actual && P.estado === 'en_ejecucion';
+  const enCaptura = actual && (enProceso || COMPLETAR.includes(P.estado));
+  const altaBatch = enProceso && puedeEn(P, 'ejecutar');
   const items = itemsDe(D.PL, D.met, { seccion: 'proceso' });
   const areas = AREAS_ORDEN.filter((a) => items.some((pl) => D.met(pl.metodo_id)?.area === a));
   const grupos = areas.map((a) => [a, AREAS[a].label, (pl) => D.met(pl.metodo_id)?.area === a]);
   const puede = enCaptura && puedeCapturarAlgo(P, areas);
-
   const Rgen = D.resDe((m) => m.nivel === 'corrida');
-  const filas = [filaUnidad({ ico: 'layers', titulo: 'Toda la prueba', sub: 'Registro general: lo que se mide una sola vez (por ejemplo, merma total, seguridad, mantenimiento)',
-    grupos, items, R: Rgen, attrs: 'data-ej="general"', puede })]
-    .concat(D.B.map((b) => filaUnidad({ ico: 'package', titulo: `${fab ? 'Batch' : 'Corrida'} #${b.numero}`,
-      sub: `${fmtDateTime(b.fecha_hora)} · ${pill(...OP[b.resultado_op])}${b.incidencias ? ` · ${esc(b.incidencias)}` : ''}`,
-      grupos, items, R: D.resDe((m) => m.nivel === 'batch' && m.batch_id === b.id), attrs: `data-ej="b-cap" data-id="${esc(b.id)}"`, puede,
-      extra: `${iconBtn(`data-ej="b-evi" data-id="${esc(b.id)}"`, 'paperclip', 'Adjuntar evidencia')}${altaBatch ? iconBtn(`data-ej="b-del" data-id="${esc(b.id)}"`, 'trash-2', `Eliminar ${noun}`, 'bad') : ''}` })));
 
-  // Avance por área: parámetros con al menos un valor (en cualquier registro)
-  const avance = areas.map((a) => { const xs = items.filter((pl) => D.met(pl.metodo_id)?.area === a); const n = conDato(xs, D.R);
-    return `<div class="av-row"><span>${icon(AREAS[a].ico)} ${esc(AREAS[a].label)}</span><div class="av-bar"><i style="width:${xs.length ? Math.round((n / xs.length) * 100) : 0}%"></i></div><b>${n}/${xs.length}</b></div>`; }).join('');
+  const general = mosaico({ ico: 'layers', titulo: 'Toda la prueba', cls: 'ut-general',
+    sub: 'Registro general: lo que se mide una sola vez (merma total, condiciones de seguridad, funcionamiento del equipo…)',
+    grupos, items, R: Rgen, attrs: 'data-ej="general"', puede });
+  const lotes = D.B.map((b) => mosaico({ ico: 'package', titulo: `${Noun} #${b.numero}`,
+    sub: `${fmtDateTime(b.fecha_hora)} · ${pill(...OP[b.resultado_op])}${b.incidencias ? ` · ${esc(b.incidencias)}` : ''}`,
+    grupos, items, R: D.resDe((m) => m.nivel === 'batch' && m.batch_id === b.id), attrs: `data-ej="b-cap" data-id="${esc(b.id)}"`, puede,
+    extra: `${iconBtn(`data-ej="b-evi" data-id="${esc(b.id)}"`, 'paperclip', 'Adjuntar evidencia')}${altaBatch ? iconBtn(`data-ej="b-del" data-id="${esc(b.id)}"`, 'trash-2', `Eliminar ${noun}`, 'bad') : ''}` }));
 
-  const reqs = [[D.R.length > 0 || D.B.length > 0, 'Al menos un dato registrado']];
   let estadoHTML = '';
   if (!actual) estadoHTML = aviso(`Consulta de la ejecución #${ej}.`);
-  else if (COMPLETAR.includes(P.estado)) estadoHTML = aviso('El registro durante el proceso terminó. Los valores que falten (por ejemplo, resultados de laboratorio) aún se pueden completar.', '', 'info');
-  else if (abierta && !puedeEn(P, 'ejecutar')) estadoHTML = aviso('El registro lo hace cada área: Calidad, Producción, Seguridad y Mantenimiento.');
+  else if (COMPLETAR.includes(P.estado)) estadoHTML = aviso('La prueba terminó. Los valores que falten (por ejemplo, resultados de laboratorio) aún se pueden completar.', '', 'info');
+  else if (enProceso && !puede) estadoHTML = aviso('Cada área registra sus parámetros: Calidad, Producción, Seguridad y Mantenimiento.');
 
   pane.innerHTML = `${estadoHTML}
     <div class="grid grid-main mt-s">
-      <div><div class="card">
-        ${cardHead('Registros de la prueba', `Registre cada parámetro para toda la prueba o por ${noun}. Agregue un ${noun} cada vez que se produzca uno.`,
-          `${selEjecucion(P, ej)}${altaBatch ? btn('data-ej="b-nuevo"', 'plus', `Agregar ${noun}`, 'primary') : ''}`)}
-        ${items.length ? `<div class="unit-list">${filas.join('')}</div>` : vacio('Aún no hay parámetros definidos. Cada área los define en la pestaña Registro.')}
-        ${abierta && (puedeEn(P, 'preparar') || puedeEn(P, 'ejecutar')) ? `<p class="hint mt-s">¿Falta un parámetro? <button class="link-btn" data-tab="registro">${icon('plus')} Agréguelo en Registro → Parámetros a evaluar</button></p>` : ''}
-      </div></div>
-      <div class="card"><div class="card-head"><div><h3>Avance por área</h3><p>Parámetros con al menos un valor</p></div></div>
-        <div class="av-list">${avance || vacio('Sin parámetros.')}</div>
-        ${abierta ? `${checklist(reqs)}
-          ${P.estado === 'en_ejecucion' && puedeEn(P, 'ejecutar') ? `<button class="btn primary block mt" data-ej="terminar" ${reqs.every(([ok]) => ok) ? '' : 'disabled'}>${icon('flag')} Terminar y pasar a resultados</button>` : ''}
-          <p class="hint mt-s">${P.estado === 'en_ejecucion' ? 'Lo que falte de laboratorio se puede completar después.' : 'El registro empieza con el primer dato capturado.'}</p>` : ''}
+      <div>
+        <div class="card">
+          <div class="card-head"><div><h3>¿Dónde va a registrar?</h3><p>Elija <b>Toda la prueba</b> para lo que se mide una sola vez, o un <b>${noun}</b> para los valores de cada ${noun} producido.</p></div>${selEjecucion(P, ej)}</div>
+          ${items.length ? `<div class="unit-choice">
+              ${general}
+              <div class="unit-tile ut-batches">
+                <div class="ut-main as-head"><span class="ut-ico">${icon('package')}</span><span class="ut-txt"><b>Por ${noun}</b>
+                  <small>${D.B.length ? `${D.B.length} ${noun}(es) registrado(s)` : `Aún no hay ${noun}es: agregue uno cada vez que se produzca`}</small></span></div>
+                ${altaBatch ? `<button type="button" class="btn primary block" data-ej="b-nuevo">${icon('plus')} Nuevo ${noun}</button>` : `<p class="hint" style="margin:6px 2px 0">${enProceso ? `Los ${noun}es los agrega quien registra durante el proceso.` : `Ya no se agregan ${noun}es.`}</p>`}
+              </div>
+            </div>
+            ${lotes.length ? `<div class="section-title mt">${icon('package')} ${Noun}es de la prueba</div><div class="unit-grid">${lotes.join('')}</div>` : ''}`
+            : vacio('Aún no hay parámetros definidos. Cada área los define en la pestaña Registro; también se pueden agregar ahora.')}
+          ${enProceso && areas.length < 4 ? `<p class="hint mt-s">¿Falta un parámetro? <button class="link-btn" data-tab="registro">${icon('plus')} Agréguelo en Registro → Parámetros a evaluar</button></p>` : ''}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h3>Participación por área</h3><p>Participa el área que registra algún dato</p></div></div>
+        <div class="area-rows">${estadoAreas(P, E, items, D)}</div>
+        ${enProceso && (puedeEn(P, 'preparar') || puedeEn(P, 'ejecutar')) ? `<button class="btn primary block mt" data-pa="terminar" ${D.R.length || D.B.length ? '' : 'disabled'}>${icon('flag')} Terminar prueba</button>
+          <p class="hint mt-s">${D.R.length || D.B.length ? 'Lo que falte de laboratorio se puede completar después.' : 'Se termina cuando haya al menos un dato registrado.'}</p>` : ''}
       </div>
     </div>`;
   refreshIcons();
@@ -110,8 +160,8 @@ export async function etapaProceso(pane, ctx) {
       switch (b.dataset.ej) {
         case 'b-nuevo': {
           let r = await capturaForm(P, { unidad: 'batch', seccion: 'proceso' });
-          while (r?.siguiente) r = await capturaForm({ ...P, estado: 'en_ejecucion' }, { unidad: 'batch', seccion: 'proceso', previo: r.previo });
-          ctx.refrescar('proceso', ej); return;
+          while (r?.siguiente) r = await capturaForm(P, { unidad: 'batch', seccion: 'proceso', previo: r.previo });
+          recargar(); return;
         }
         case 'general': if (!await capturaForm(P, { unidad: 'corrida', seccion: 'proceso' })) return; break;
         case 'b-cap': if (!await capturaForm(P, { unidad: 'batch', seccion: 'proceso', batch: D.B.find((x) => x.id === id) })) return; break;
@@ -119,9 +169,6 @@ export async function etapaProceso(pane, ctx) {
           if (!await confirmDialog({ title: `Eliminar ${noun}`, message: `Se eliminará el ${noun}. Si ya tiene parámetros registrados, bórrelos primero.`, confirmText: 'Eliminar', danger: true })) return;
           mustRow(await sb.from('batches_prubind').delete().eq('id', id).select('id')); break;
         case 'b-evi': if (!await subirEvidencia(P, { batch_id: id, etapa: 'ejecucion' })) return; break;
-        case 'terminar':
-          if (!await confirmDialog({ title: 'Terminar registro en proceso', message: 'La prueba pasará a resultados: cada área evaluará sus parámetros (Cumple / No cumple). Los valores pendientes de laboratorio aún se podrán completar.', confirmText: 'Terminar' })) return;
-          await accion(P.id, 'terminar_ejecucion'); toast('Registro en proceso terminado; inicia la evaluación de resultados.', 'success'); ctx.refrescar('resultados'); return;
         default: return;
       }
       recargar();
@@ -136,20 +183,26 @@ export async function etapaComplementarias(pane, ctx) {
     pane.innerHTML = aviso('Las evaluaciones complementarias solo aplican a materia prima, reformulaciones y productos nuevos. Esta prueba pasa directo a resultados.');
     refreshIcons(); return;
   }
+  if (ANTES.includes(P.estado)) {
+    pane.innerHTML = aviso('Las evaluaciones complementarias se registran cuando la prueba ya inició.', '', 'circle-play');
+    refreshIcons(); return;
+  }
   const fab = P.ejecucion_form === 'fabricacion';
   const D = await cargarDatos(P, P.ejecucion_actual);
   const items = itemsDe(D.PL, D.met, { seccion: 'complementarias' });
-  const enCaptura = ABIERTA.includes(P.estado) || COMPLETAR.includes(P.estado);
+  const enCaptura = P.estado === 'en_ejecucion' || COMPLETAR.includes(P.estado);
   const puede = enCaptura && puedeCapturarAlgo(P, ['calidad']);
   const cats = COMPLEMENTARIAS.filter((c) => items.some((pl) => D.met(pl.metodo_id)?.categoria === c));
   const grupos = cats.map((c) => [c, NOM_CAT[c], (pl) => D.met(pl.metodo_id)?.categoria === c]);
-  const filas = [filaUnidad({ ico: 'layers', titulo: 'Toda la prueba', sub: 'Una muestra representativa de la prueba', grupos, items, R: D.resDe((m) => m.nivel === 'corrida'), attrs: 'data-co="general"', puede })]
-    .concat(D.B.map((b) => filaUnidad({ ico: 'package', titulo: `${fab ? 'Batch' : 'Corrida'} #${b.numero}`, sub: fmtDateTime(b.fecha_hora),
+  const tiles = [mosaico({ ico: 'layers', titulo: 'Toda la prueba', cls: 'ut-general', sub: 'Una muestra representativa de la prueba', grupos, items, R: D.resDe((m) => m.nivel === 'corrida'), attrs: 'data-co="general"', puede })]
+    .concat(D.B.map((b) => mosaico({ ico: 'package', titulo: `${fab ? 'Batch' : 'Corrida'} #${b.numero}`, sub: fmtDateTime(b.fecha_hora),
       grupos, items, R: D.resDe((m) => m.nivel === 'batch' && m.batch_id === b.id), attrs: `data-co="cap" data-id="${esc(b.id)}"`, puede })));
   pane.innerHTML = `<div class="card">
-    ${cardHead('Evaluaciones complementarias', 'Evaluación sensorial (olor, color, sabor, textura), microbiología y análisis bromatológicos (proteínas, grasas, humedad, cenizas). Forman parte de los parámetros de Calidad; se registran para toda la prueba o por batch.')}
-    ${!items.length ? vacio('Esta prueba no tiene evaluaciones complementarias en sus parámetros a evaluar.') : `<div class="unit-list">${filas.join('')}</div>`}
-    ${items.length && !D.B.length ? '<p class="hint mt-s">Los batches se agregan en «Registro en proceso».</p>' : ''}
+    <div class="card-head"><div><h3>Evaluaciones complementarias</h3><p>Evaluación sensorial, microbiología y análisis bromatológicos. Forman parte de los parámetros de Calidad; se registran para toda la prueba o por batch.</p></div></div>
+    <div class="compl-cats">${cats.map((c) => `<span class="chip on">${icon(ICO_CAT[c])} ${esc(NOM_CAT[c])}</span>`).join('')}</div>
+    ${cats.includes('bromatologia') ? `<div class="notice info mt-s">${icon('hourglass')}<span>Los análisis bromatológicos (proteínas, grasas, humedad, cenizas) pueden quedar <b>pendientes de laboratorio</b>: no impiden evaluar ni dar el veredicto del área, y se completan cuando lleguen.</span></div>` : ''}
+    ${!items.length ? vacio('Esta prueba no tiene evaluaciones complementarias en sus parámetros a evaluar.') : `<div class="unit-grid mt-s">${tiles.join('')}</div>`}
+    ${items.length && !D.B.length ? '<p class="hint mt-s">Los batches se agregan en «En proceso».</p>' : ''}
     ${enCaptura && !puede ? aviso('Las registra Calidad.') : ''}
   </div>`;
   refreshIcons();

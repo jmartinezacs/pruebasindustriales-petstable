@@ -92,7 +92,7 @@ export const ESTADOS_PRUEBA = {
   registrada:           { label: 'Registrada',               cls: 'gray',   etapa: 2 },
   en_preparacion:       { label: 'Registrada',               cls: 'gray',   etapa: 2 },
   preparada:            { label: 'Registrada',               cls: 'gray',   etapa: 2 },
-  en_ejecucion:         { label: 'Registro en proceso',      cls: 'orange', etapa: 2 },
+  en_ejecucion:         { label: 'En proceso',               cls: 'orange', etapa: 2 },
   en_evaluacion:        { label: 'Evaluación de resultados', cls: 'violet', etapa: 4 },
   pendiente_resultados: { label: 'Pendiente de resultados',  cls: 'warn',   etapa: 4 },
   pendiente_dictamen:   { label: 'Pendiente de dictamen',    cls: 'warn',   etapa: 6 },
@@ -104,7 +104,7 @@ export const ESTADOS_PRUEBA = {
   cancelada:            { label: 'Cancelada',                cls: 'gray',   etapa: 0 },
 };
 // Etapas según el flujo de información acordado (narración del 20/10/2026)
-export const ETAPAS = [['registro', 'Registro', 'clipboard-pen'], ['proceso', 'Registro en proceso', 'factory'],
+export const ETAPAS = [['registro', 'Registro', 'clipboard-pen'], ['proceso', 'En proceso', 'factory'],
   ['complementarias', 'Evaluaciones complementarias', 'microscope'], ['resultados', 'Resultados', 'list-checks'],
   ['recomendaciones', 'Recomendaciones', 'lightbulb'], ['dictamen', 'Dictamen', 'gavel'], ['cierre', 'Cierre', 'archive']];
 // Las evaluaciones complementarias solo aplican a materia prima, reformulación y producto nuevo
@@ -119,8 +119,16 @@ export const AREAS = {
   mantenimiento: { label: 'Mantenimiento', desc: 'Funcionamiento de máquinas y equipos', captura: 'Jefe de Mantenimiento',                     evalua: 'Jefe de Mantenimiento',                      ico: 'wrench' },
 };
 export const AREAS_ORDEN = ['calidad', 'produccion', 'seguridad', 'mantenimiento'];
-// Calidad y Producción siempre participan; Seguridad y Mantenimiento son opcionales y no detienen la prueba
-export const AREAS_OBLIGATORIAS = ['calidad', 'produccion'];
+// Evaluación de cada parámetro: [texto, clase, ícono]
+export const EVALUACION = {
+  cumple: ['Cumple', 'ok', 'check'], no_cumple: ['No cumple', 'bad', 'x'], no_determinado: ['No se pudo determinar', 'warn', 'circle-help'],
+};
+// Veredicto de cada área sobre la prueba (recomendaciones_prubind.sentido)
+export const VEREDICTO = {
+  favorable: ['Satisfactoria', 'ok', 'thumbs-up', 'Por parte del área, la prueba es satisfactoria'],
+  no_favorable: ['No satisfactoria', 'bad', 'thumbs-down', 'Por parte del área, la prueba no es satisfactoria'],
+  repetir: ['Repetir prueba', 'warn', 'repeat', 'Recomienda repetir o ajustar la prueba'],
+};
 export const CERRADAS = ['cerrada_aprobada', 'cerrada_rechazada', 'cancelada'];
 export const ABIERTAS = Object.keys(ESTADOS_PRUEBA).filter((e) => !CERRADAS.includes(e));
 export const ESTADO_RES = {
@@ -289,8 +297,9 @@ export function openModal({ title, subtitle = '', body = '', submitText = 'Guard
 }
 
 // Confirmación (opcionalmente con texto obligatorio, p. ej. motivo de cancelación)
-export function confirmDialog({ title, message = '', confirmText = 'Confirmar', danger = false, input = null }) {
-  const body = `<p style="margin:0 0 6px">${esc(message)}</p>
+// html: contenido ya escapado por quien llama (en lugar de message)
+export function confirmDialog({ title, message = '', html = '', confirmText = 'Confirmar', danger = false, input = null }) {
+  const body = `${html || `<p style="margin:0 0 6px">${esc(message)}</p>`}
     ${input ? `<div class="field"><label for="cd-input">${esc(input.label)} ${input.required ? '<span class="req">*</span>' : ''}</label>
       <textarea id="cd-input" name="value" maxlength="${input.maxlength || 300}" ${input.required ? 'required' : ''} placeholder="${esc(input.placeholder || '')}"></textarea></div>` : ''}`;
   return openModal({
@@ -476,6 +485,13 @@ export function cssVar(name) { return getComputedStyle(document.documentElement)
 // ¿Tema oscuro? (para elegir los tonos validados de cada modo)
 export const temaOscuro = () => (cssVar('--card') || '#ffffff').toLowerCase() !== '#ffffff';
 const fmtEtiqueta = (v) => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 1 }).format(v);
+// Paleta categórica validada (daltonismo y contraste) para claro y oscuro: un color por
+// categoría, siempre en el mismo orden; máximo 8 categorías por gráfica.
+const PALETA = {
+  claro: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'],
+  oscuro: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'],
+};
+export const colorCategoria = (i) => PALETA[temaOscuro() ? 'oscuro' : 'claro'][i % 8];
 
 // Etiquetas de datos: valor al final de cada barra (dentro del segmento si es apilada)
 // y dentro de cada porción de la dona, con el total al centro.
@@ -509,7 +525,7 @@ const etiquetasPlugin = {
           const largo = horizontal ? Math.abs(el.x - el.base) : Math.abs(el.base - el.y);
           if (largo < w + 10) return;
           const p = el.getCenterPoint();
-          ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+          ctx.fillStyle = ds.etiquetaColor || '#ffffff'; ctx.textAlign = 'center';
           ctx.fillText(txt, p.x, p.y);
         } else if (horizontal) {
           ctx.fillStyle = text; ctx.textAlign = 'left';
@@ -866,5 +882,73 @@ document.addEventListener('click', (e) => {
   const c = lab && document.getElementById(lab.htmlFor);
   if (c?._cs?.btn) { e.preventDefault(); c._cs.btn.focus(); }
 });
+
+// ---------- Avisos (notificaciones push) ----------
+// Se envían en segundo plano; si fallan no afectan la operación de la prueba.
+// La Edge Function valida que el evento sea real y elige a quién avisar.
+export function avisar(evento, pruebaId) {
+  try { sb.functions.invoke('notificar_prubind', { body: { accion: 'aviso', evento, prueba_id: pruebaId } }).catch(() => {}); } catch { /* sin conexión */ }
+}
+function b64uToUint8(s) {
+  const pad = '='.repeat((4 - (s.length % 4)) % 4);
+  const raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+export const push = {
+  soportado: () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext,
+  esIOS: () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
+  instalada: () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true,
+  async suscripcion() {
+    if (!push.soportado()) return null;
+    const reg = await navigator.serviceWorker.getRegistration('/');
+    return reg ? reg.pushManager.getSubscription() : null;
+  },
+  // 'no-soportado' | 'instalar' (iOS sin instalar) | 'bloqueado' | 'activo' | 'inactivo'
+  async estado() {
+    if (push.esIOS() && !push.instalada()) return 'instalar';
+    if (!push.soportado()) return 'no-soportado';
+    if (Notification.permission === 'denied') return 'bloqueado';
+    return (await push.suscripcion()) && Notification.permission === 'granted' ? 'activo' : 'inactivo';
+  },
+  async guardar(sub) {
+    const j = sub.toJSON();
+    const { error } = await sb.from('push_subs_prubind').insert({
+      usuario_id: state.profile.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth,
+      dispositivo: navigator.userAgent.slice(0, 200),
+    });
+    if (error && error.code !== '23505') throw error;
+  },
+  async activar() {
+    if (!push.soportado()) throw new Error('Este navegador no admite notificaciones.');
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw new Error('No se concedió el permiso de notificaciones.');
+    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    await navigator.serviceWorker.ready;
+    let { data: pub } = await sb.rpc('prubind_vapid_publica');
+    if (!pub) {
+      const r = await sb.functions.invoke('notificar_prubind', { body: { accion: 'init' } });
+      pub = r.data?.publica;
+    }
+    if (!pub) throw new Error('No se pudo obtener la clave de notificaciones. Intenta más tarde.');
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToUint8(pub) });
+    await push.guardar(sub);
+  },
+  async desactivar() {
+    const sub = await push.suscripcion();
+    if (sub) {
+      await sb.from('push_subs_prubind').delete().eq('endpoint', sub.endpoint);
+      await sub.unsubscribe().catch(() => {});
+    }
+  },
+  // Al iniciar sesión: si el dispositivo ya tenía permiso, re-vincula la suscripción a este usuario
+  async sincronizar() {
+    try {
+      if (!push.soportado() || Notification.permission !== 'granted') return;
+      const sub = await push.suscripcion();
+      if (sub) await push.guardar(sub);
+    } catch { /* silencioso */ }
+  },
+};
 
 export function navigate(hash) { if (location.hash !== hash) location.hash = hash; else window.dispatchEvent(new HashChangeEvent('hashchange')); }

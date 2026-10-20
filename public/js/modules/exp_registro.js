@@ -1,7 +1,7 @@
 // =====================================================================
 // Etapa 1 · Registro: parámetros a evaluar por área y formulación.
-// Calidad y Producción participan siempre; Seguridad y Mantenimiento solo
-// cuando la prueba los involucra. Los parámetros de Calidad son casi
+// Cada área define sus parámetros (o indica que no tiene nada que evaluar)
+// antes de iniciar o durante la prueba. Los parámetros de Calidad son casi
 // siempre los mismos; los de Producción y Mantenimiento cambian según la
 // prueba, por eso se pueden agregar (y quedan guardados en el catálogo).
 // =====================================================================
@@ -12,7 +12,7 @@ import {
 } from '../core.js';
 import { cardHead, btn, iconBtn, aviso, vacio, accion, criterioTxt } from './exp_comun.js';
 
-// Todas las áreas participan siempre; Seguridad y Mantenimiento no detienen la prueba si no registran su parte
+// Los parámetros se definen o se agregan mientras la prueba no termina
 const ABIERTA = ['registrada', 'en_preparacion', 'preparada', 'en_ejecucion'];
 export const esCompl = (m) => COMPLEMENTARIAS.includes(m?.categoria);
 
@@ -166,13 +166,15 @@ export function montarSelector(cont, { getTipo, puedeDefinir }) {
 // Cada área agrega o quita los suyos; quien registra indica si se involucra
 // Seguridad o Mantenimiento (no detienen la prueba si no registran su parte).
 export async function montarParametrosPrueba(el, P, recargar) {
-  const [metodos, unidades, plan, pars, conRes] = await Promise.all([
+  const [metodos, unidades, plan, pars, conRes, sinPar] = await Promise.all([
     getCat('metodos'), getCat('unidades'),
     sb.from('plan_evaluacion_prubind').select('*').eq('prueba_id', P.id).eq('incluido', true).order('orden'),
     sb.from('prueba_parametros_prubind').select('*').eq('prueba_id', P.id).order('orden'),
     sb.from('resultados_prubind').select('plan_id').eq('prueba_id', P.id),
+    sb.from('areas_sin_parametros_prubind').select('area, motivo, created_at, por:usuarios_prubind!areas_sin_parametros_prubind_declarado_por_fkey(nombre)').eq('prueba_id', P.id),
   ]);
-  [plan, pars, conRes].forEach((r) => { if (r.error) throw r.error; });
+  [plan, pars, conRes, sinPar].forEach((r) => { if (r.error) throw r.error; });
+  const declarada = (a) => sinPar.data.find((s) => s.area === a);
   const usados = new Set(conRes.data.map((r) => r.plan_id));
   const met = (id) => metodos.find((m) => m.id === id);
   const abierta = ABIERTA.includes(P.estado);
@@ -186,19 +188,26 @@ export async function montarParametrosPrueba(el, P, recargar) {
   const crit = (pl, m) => criterioTxt(pl, unidadTxt(unidades, m.unidad_id));
   const item = ({ pl, m }, area) => `<li><span>${esc(m.nombre)} <span class="cell-sub">· ${esc(medidaTxt(m, unidades))}${crit(pl, m) ? ` · criterio ${esc(crit(pl, m))}` : ''}</span></span>
     ${editaArea(area) && !usados.has(pl.id) ? iconBtn(`data-par="quitar" data-id="${esc(pl.id)}" data-nom="${esc(m.nombre)}"`, 'x', 'Quitar parámetro', 'bad') : ''}</li>`;
-  el.innerHTML = `<div class="card mt">${cardHead('Parámetros a evaluar', 'Cada área define los parámetros que le corresponden.')}
+  el.innerHTML = `<div class="card mt">${cardHead('Parámetros a evaluar', 'Cada área define los parámetros que le corresponden o indica que no tiene nada que evaluar. También se pueden agregar durante la prueba.')}
     <div class="areas-grid">${areas.map((area) => {
       const xs = porArea[area] || [], proc = xs.filter((x) => !esCompl(x.m)), compl = xs.filter((x) => esCompl(x.m));
-      const opcional = false;
       const sinDefinir = !xs.length && !(area === 'produccion' && pars.data.length);
-      return `<div class="area-block"><div class="area-head">${icon(AREAS[area].ico)}<div><b>${esc(AREAS[area].label)}</b><span>${esc(AREAS[area].desc)}</span></div>
-          ${opcional ? '<span class="area-tag opt">Opcional</span>' : ''}</div>
-        ${sinDefinir ? `<p class="hint area-nota">${icon('hourglass')} ${editaArea(area) ? 'Defina los parámetros de su área.' : `${esc(AREAS[area].label)} aún no define sus parámetros.`}</p>` : ''}
+      const dec = declarada(area);
+      if (dec) {
+        return `<div class="area-block area-na"><div class="area-head">${icon(AREAS[area].ico)}<div><b>${esc(AREAS[area].label)}</b><span>${esc(AREAS[area].desc)}</span></div>
+            <span class="area-tag na">${icon('circle-slash')} Sin nada que evaluar</span></div>
+          <p class="hint area-nota">${esc(dec.por?.nombre || 'El responsable')} indicó que su área no tiene nada que evaluar en esta prueba${dec.motivo ? `: “${esc(dec.motivo)}”` : '.'}</p>
+          <div class="area-acts">${editaArea(area) ? `<button type="button" class="link-btn" data-par="retomar" data-area="${area}">${icon('rotate-ccw')} Sí hay algo que evaluar</button>` : ''}</div></div>`;
+      }
+      return `<div class="area-block ${sinDefinir ? 'pendiente' : ''}"><div class="area-head">${icon(AREAS[area].ico)}<div><b>${esc(AREAS[area].label)}</b><span>${esc(AREAS[area].desc)}</span></div>
+          ${sinDefinir ? `<span class="area-tag wait">${icon('hourglass')} Por definir</span>` : `<span class="area-tag ok">${xs.length + (area === 'produccion' ? pars.data.length : 0)} parámetro(s)</span>`}</div>
+        ${sinDefinir ? `<p class="hint area-nota">${editaArea(area) ? 'Defina los parámetros de su área o indique que no tiene nada que evaluar.' : `${esc(AREAS[area].label)} aún no define sus parámetros. Si no registra nada durante la prueba, se considera que no requirió participar.`}</p>` : ''}
         ${proc.length ? `<ul class="param-list">${proc.map((x) => item(x, area)).join('')}</ul>` : ''}
         ${compl.length ? `<div class="sub-title">Evaluaciones complementarias</div><ul class="param-list">${compl.map((x) => item(x, area)).join('')}</ul>` : ''}
         ${area === 'produccion' && pars.data.length ? `<div class="sub-title">Parámetros del equipo (${esc(P.equipo_nombre || 'equipo')})</div><ul class="param-list">${pars.data.map((x) =>
           `<li><span>${esc(x.nombre)} <span class="cell-sub">· ${esc(x.minimo != null || x.maximo != null ? criterioTxt({ crit_minimo: x.minimo, crit_maximo: x.maximo }, unidadTxt(unidades, x.unidad_id)) : (x.referencia || '').split(' · ')[0] || 'referencia del equipo')}</span></span></li>`).join('')}</ul>` : ''}
-        <div class="area-acts">${editaArea(area) ? `<button type="button" class="${sinDefinir ? 'btn primary sm' : 'link-btn'}" data-par="${sinDefinir ? 'definir' : 'agregar'}" data-area="${area}">${icon(sinDefinir ? 'list-checks' : 'plus')} ${sinDefinir ? 'Definir parámetros' : 'Agregar parámetro'}</button>` : ''}</div></div>`;
+        <div class="area-acts">${editaArea(area) ? `<button type="button" class="${sinDefinir ? 'btn primary sm' : 'link-btn'}" data-par="${sinDefinir ? 'definir' : 'agregar'}" data-area="${area}">${icon(sinDefinir ? 'list-checks' : 'plus')} ${sinDefinir ? 'Definir parámetros' : 'Agregar parámetro'}</button>
+          ${!xs.some((x) => usados.has(x.pl.id)) && !(area === 'produccion' && pars.data.length) ? `<button type="button" class="btn ghost sm" data-par="nada" data-area="${area}">${icon('circle-slash')} Nada que evaluar por mi área</button>` : ''}` : ''}</div></div>`;
     }).join('')}</div>
     ${sumables.length ? `<p class="hint mt-s">¿La prueba involucra otra área? ${sumables.map((a) => `<button type="button" class="link-btn" data-par="incluir" data-area="${a}">${icon('plus')} ${esc(AREAS[a].label)}</button>`).join(' ')}</p>` : ''}
   </div>`;
@@ -225,6 +234,16 @@ export async function montarParametrosPrueba(el, P, recargar) {
           if (!await confirmDialog({ title: 'Quitar parámetro', message: `"${b.dataset.nom}" ya no se evaluará en esta prueba.`, confirmText: 'Quitar' })) return;
           must(await sb.rpc('prubind_definir_parametros', { p_prueba: P.id, p_agregar: [], p_quitar: [b.dataset.id] }));
           toast('Parámetro quitado.', 'success'); break;
+        case 'nada': {
+          const r = await confirmDialog({ title: `${AREAS[area].label}: nada que evaluar`, message: `${AREAS[area].label} no participará en esta prueba${(porArea[area] || []).length ? ' y se quitarán los parámetros que había definido' : ''}. Si cambia de opinión, puede retomarla mientras la prueba no termine.`,
+            confirmText: 'Confirmar', input: { label: 'Motivo (opcional)', maxlength: 300, placeholder: 'Ej. El cambio no afecta al área' } });
+          if (!r) return;
+          must(await sb.rpc('prubind_area_sin_parametros', { p_prueba: P.id, p_area: area, p_motivo: r.value || null, p_quitar: false }));
+          toast(`${AREAS[area].label} quedó sin nada que evaluar en esta prueba.`, 'success'); break;
+        }
+        case 'retomar':
+          must(await sb.rpc('prubind_area_sin_parametros', { p_prueba: P.id, p_area: area, p_motivo: null, p_quitar: true }));
+          toast(`${AREAS[area].label} vuelve a participar: defina sus parámetros.`, 'success'); break;
         case 'incluir': case 'excluir': {
           const nuevas = [...involucradas].filter((a) => a !== area || b.dataset.par === 'incluir');
           if (b.dataset.par === 'incluir') nuevas.push(area);
@@ -303,7 +322,7 @@ export async function montarFormulacion(el, P, recargar) {
     </tbody></table></div>
     <p class="hint mt-s">Total por batch: <b>${esc(fmtQty(Math.round(F.reduce((s, f) => s + (un(f.unidad_id) === 'kg' ? Number(f.cantidad_propuesta || 0) : 0), 0) * 1000) / 1000, 'kg'))}</b>.${editable ? ` Para quitar una materia prima use ${icon('minus-circle')} o escriba 0.` : ''}</p>`
       : vacio(editable ? 'Agregue las materias primas de la receta.' : 'Sin formulación registrada.')}
-    ${!editable && ['registrada', 'en_preparacion'].includes(P.estado) ? '' : !editable ? '<p class="hint">La formulación se ajusta antes de empezar el registro durante el proceso.</p>' : ''}
+    ${!editable && ['registrada', 'en_preparacion'].includes(P.estado) ? '' : !editable ? '<p class="hint">La formulación se ajusta antes de iniciar la prueba.</p>' : ''}
   </div>`;
   refreshIcons();
   el.addEventListener('change', async (e) => {
