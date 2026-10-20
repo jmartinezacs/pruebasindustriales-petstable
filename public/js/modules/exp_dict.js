@@ -1,33 +1,30 @@
 // =====================================================================
-// Etapas 6 y 7 · Dictamen de Alta Dirección (con el consolidado de
-// resultados y recomendaciones por área) y Cierre.
-// La aprobación no libera producto ni autoriza el cambio en producción:
-// la implementación requiere autorizaciones separadas.
+// Etapas 6 y 7 · Dictamen y aprobación de Alta Dirección (con el
+// consolidado de resultados y veredictos por área) y Cierre.
+// Un dictamen "Aprobada" autoriza implementar el cambio; después la
+// Gerencia de Procesos y Mejora Continua cierra la prueba.
 // =====================================================================
 import {
-  sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, getCat, invalidateCat, opciones, fmtDateTime,
+  sb, esc, icon, toast, errMsg, openModal, confirmDialog, getCat, opciones, fmtDateTime,
   pill, estadoPill, autoridad, AREAS, AREAS_ORDEN, EVALUACION, VEREDICTO, refreshIcons,
 } from '../core.js';
 import { box, txt, cardHead, btn, aviso, vacio, checklist, accion } from './exp_comun.js';
 import { consolidarResultados } from './exp_eval.js';
 
-const DICT = { aprobada: ['Aprobada', 'ok'], rechazada: ['Rechazada', 'bad'], requiere_repeticion: ['Requiere repetición', 'warn'], pendiente_resultados: ['Pendiente de resultados', 'warn'] };
+const DICT = { aprobada: ['Aprobada · implementación autorizada', 'ok'], rechazada: ['Rechazada', 'bad'], requiere_repeticion: ['Requiere repetición', 'warn'], pendiente_resultados: ['Pendiente de resultados', 'warn'] };
 
 async function consolidado(P) {
-  const [batches, lotes, controles, dict, aut, adj, puestos, autImpl, RES] = await Promise.all([
+  const [batches, lotes, controles, dict, aut, adj, RES] = await Promise.all([
     sb.from('v_batches_prubind').select('*').eq('prueba_id', P.id).order('ejecucion').order('numero'),
     sb.from('lotes_diarios_prubind').select('*').eq('prueba_id', P.id).order('fecha'),
     sb.from('ejecucion_controles_prubind').select('*').eq('prueba_id', P.id).order('created_at'),
     sb.from('dictamenes_prubind').select('*, por:usuarios_prubind!dictamenes_prubind_emitido_por_fkey(nombre), motivo:motivos_prubind(nombre)').eq('prueba_id', P.id).order('created_at'),
     sb.from('autorizaciones_prubind').select('*, por:usuarios_prubind!autorizaciones_prubind_autorizado_por_fkey(nombre), puesto:puestos_prubind(nombre)').eq('prueba_id', P.id).order('created_at'),
     sb.from('adjuntos_prubind').select('id, nombre, etapa, created_at, tipo:tipos_evidencia_prubind(nombre)').eq('prueba_id', P.id),
-    getCat('puestos'),
-    sb.from('autoridades_prubind').select('tipo, accion, puesto_id, usuario_id, activo').eq('accion', 'autorizar_implementacion').eq('activo', true),
     consolidarResultados(P),
   ]);
-  [batches, lotes, controles, dict, aut, adj, autImpl].forEach((r) => { if (r.error) throw r.error; });
-  return { B: batches.data, L: lotes.data, C: controles.data, D: dict.data, A: aut.data, ADJ: adj.data, puestos, RES,
-    IMPL: autImpl.data.filter((a) => !a.tipo || a.tipo === P.tipo) };
+  [batches, lotes, controles, dict, aut, adj].forEach((r) => { if (r.error) throw r.error; });
+  return { B: batches.data, L: lotes.data, C: controles.data, D: dict.data, A: aut.data, ADJ: adj.data, RES };
 }
 
 function resumenHTML(P, K, ej) {
@@ -72,7 +69,7 @@ export async function etapaDictamen(pane, ctx) {
   pane.innerHTML = `
     <div class="grid grid-main">
       <div class="card">${cardHead('Resumen consolidado', 'Resultados por parámetro y recomendaciones de cada área.')}${resumenHTML(P, K, P.ejecucion_actual)}</div>
-      <div class="card">${cardHead('Dictamen de Alta Dirección')}
+      <div class="card">${cardHead('Dictamen y aprobación', 'Alta Dirección dictamina; si aprueba, queda autorizado implementar el cambio.')}
         ${checklist(bloqueos)}
         ${E.no_cumple && P.estado === 'pendiente_dictamen' ? aviso(`${E.no_cumple} parámetro(s) no cumplen. Para aprobar, explique la decisión en la conclusión.`, 'warn', 'alert-triangle') : ''}
         ${puedeDict ? `<button class="btn primary block" data-dc="emitir">${icon('gavel')} Emitir dictamen</button>`
@@ -92,17 +89,17 @@ export async function etapaDictamen(pane, ctx) {
 async function dictamenForm(P, aprobable, noCumple) {
   const motivos = (await getCat('motivos', { activos: true })).filter((m) => m.tipo === 'rechazo');
   return openModal({
-    title: 'Emitir dictamen', subtitle: `${P.folio} · ${P.cambio}`, submitText: 'Emitir dictamen', size: 'lg',
+    title: 'Dictamen y aprobación', subtitle: `${P.folio} · ${P.cambio}`, submitText: 'Emitir dictamen', size: 'lg',
     body: `<div class="field"><span class="label">Dictamen <span class="req">*</span></span>
         <div class="radio-cards multi">
-          <label><input type="radio" name="d" value="aprobada" ${aprobable ? '' : 'disabled'}><span>${icon('badge-check')} Aprobada</span></label>
+          <label><input type="radio" name="d" value="aprobada" ${aprobable ? '' : 'disabled'}><span>${icon('badge-check')} Aprobada<small>Se autoriza implementar el cambio</small></span></label>
           <label><input type="radio" name="d" value="rechazada"><span>${icon('x-octagon')} Rechazada</span></label>
           <label><input type="radio" name="d" value="requiere_repeticion"><span>${icon('repeat')} Requiere repetición</span></label>
           <label><input type="radio" name="d" value="pendiente_resultados"><span>${icon('hourglass')} Pendiente de resultados</span></label>
         </div>${aprobable ? '' : '<small class="hint">"Aprobada" no está disponible: faltan evaluaciones o recomendaciones de las áreas.</small>'}</div>
       <div class="field hidden" id="dc-mot-w"><label for="dc-mot">Motivo de rechazo <span class="req">*</span></label><select id="dc-mot" name="motivo">${opciones(motivos, null)}</select></div>
       <div class="field"><label for="dc-t">Conclusión</label><textarea id="dc-t" name="texto" maxlength="1000" rows="3" placeholder="${noCumple ? 'Obligatoria para aprobar con parámetros que no cumplen y para repetir la prueba' : 'Obligatoria si se requiere repetición'}"></textarea></div>
-      ${aviso('Un dictamen aprobado no libera el producto ni autoriza por sí mismo el cambio en producción.', '', 'info')}`,
+      ${aviso('Al aprobar, Alta Dirección autoriza implementar el cambio. Después, la Gerencia de Procesos y Mejora Continua cierra la prueba.', '', 'info')}`,
     onOpen: ({ form }) => form.addEventListener('change', () => {
       form.querySelector('#dc-mot-w').classList.toggle('hidden', form.querySelector('input[name=d]:checked')?.value !== 'rechazada');
     }),
@@ -126,18 +123,8 @@ export async function etapaCierre(pane, ctx) {
   }
   const K = await consolidado(P);
   const ult = K.D[K.D.length - 1];
-  const impl = K.A.filter((a) => a.tipo === 'implementacion');
-
-  const firmas = K.IMPL.map((a) => {
-    const nombre = a.puesto_id ? (K.puestos.find((p) => p.id === a.puesto_id)?.nombre || 'Puesto') : 'Usuario asignado';
-    const f = impl.find((z) => (a.puesto_id && z.puesto_id === a.puesto_id) || (a.usuario_id && z.autorizado_por === a.usuario_id));
-    return [!!f, `${nombre}${f ? ` — ${f.por?.nombre} · ${fmtDateTime(f.created_at)}` : ' — pendiente'}`];
-  });
-  const yaFirme = impl.some((z) => z.autorizado_por === state.profile.id || (z.puesto_id && z.puesto_id === state.profile.puesto_id));
   const puedeCerrar = ['aprobada', 'rechazada'].includes(P.estado) && autoridad(P.tipo, 'cerrar');
-  const puedeImpl = P.estado === 'cerrada_aprobada' && autoridad(P.tipo, 'autorizar_implementacion') && !yaFirme;
-  const implCompleta = firmas.length > 0 && firmas.every(([ok]) => ok);
-  const publicable = state.isAdmin && P.estado === 'cerrada_aprobada' && implCompleta && P.receta_version_id && (P.secciones_prep || []).includes('formulacion');
+  const aprobada = ['aprobada', 'cerrada_aprobada'].includes(P.estado);
   pane.innerHTML = `
     <div class="grid grid-main">
       <div class="card">${cardHead('Expediente de cierre', '', btn('data-ci="imprimir"', 'printer', 'Imprimir expediente'))}
@@ -152,14 +139,10 @@ export async function etapaCierre(pane, ctx) {
         </div>
         <div class="section-title">${icon('list-checks')} Resultados y recomendaciones</div>${resumenHTML(P, K, P.ejecucion_actual)}
       </div>
-      <div class="card">${cardHead('Cierre e implementación')}
+      <div class="card">${cardHead('Cierre', 'Lo realiza la Gerencia de Procesos y Mejora Continua.')}
+        ${aprobada ? aviso(`<b>Implementación autorizada</b> en el dictamen de Alta Dirección${ult ? ` (${esc(ult.por?.nombre || '')} · ${fmtDateTime(ult.created_at)})` : ''}.`, '', 'badge-check') : ''}
         ${puedeCerrar ? `<button class="btn primary block" data-ci="cerrar">${icon('archive')} Cerrar prueba</button>` : ['aprobada', 'rechazada'].includes(P.estado) ? aviso('Cierra quien tenga autoridad de cierre para este tipo de prueba.') : ''}
-        <div class="section-title">${icon('stamp')} Autorización para implementar el cambio</div>
-        ${P.estado === 'cerrada_aprobada' || impl.length ? (firmas.length ? checklist(firmas) : aviso('No hay puestos configurados para autorizar la implementación de este tipo de prueba (Autoridades).', 'warn', 'alert-triangle')) : vacio('Disponible cuando la prueba esté cerrada y aprobada.')}
-        ${puedeImpl ? `<button class="btn primary block" data-ci="impl">${icon('stamp')} Autorizar implementación</button>` : ''}
-        ${implCompleta ? aviso('Implementación autorizada por todos los puestos requeridos.', '', 'check-circle-2') : ''}
-        ${publicable ? `<button class="btn secondary block mt-s" data-ci="publicar">${icon('book-plus')} Actualizar la receta con la formulación aprobada</button>` : ''}
-        ${aviso('Una prueba aprobada no libera el producto experimental para comercialización ni autoriza por sí misma el cambio en la producción habitual.', 'warn', 'shield-alert')}
+        ${P.cerrada_at ? aviso(`Prueba cerrada por ${esc(P.cerrada_por_nombre || '')} el ${fmtDateTime(P.cerrada_at)}.`, '', 'archive') : ''}
       </div>
     </div>`;
   refreshIcons();
@@ -174,20 +157,6 @@ export async function etapaCierre(pane, ctx) {
           confirmText: 'Cerrar', input: { label: conPend ? 'Disposición formal (hay parámetros sin resultado)' : 'Comentario de cierre (opcional)', required: conPend, maxlength: 1000 } });
         if (!r) return;
         await accion(P.id, 'cerrar', { texto: r.value }); toast('Prueba cerrada.', 'success');
-      } else if (b.dataset.ci === 'impl') {
-        const r = await confirmDialog({ title: 'Autorizar implementación', message: `Registra su autorización (${state.profile.puesto || 'sin puesto'}) para implementar el cambio evaluado en ${P.folio}.`, confirmText: 'Autorizar',
-          input: { label: 'Comentario (opcional)', required: false, maxlength: 500 } });
-        if (!r) return;
-        await accion(P.id, 'autorizar_implementacion', { texto: r.value }); toast('Autorización registrada.', 'success');
-      } else if (b.dataset.ci === 'publicar') {
-        if (!await confirmDialog({ title: `Actualizar la receta ${P.receta_nombre}`, message: `La formulación aprobada pasará a ser la receta vigente de "${P.receta_nombre}". La receta anterior se conserva en el historial.`,
-          confirmText: 'Actualizar receta' })) return;
-        // El nombre interno de la versión se asigna solo (no se muestra al usuario)
-        const versiones = await getCat('versiones', { force: true });
-        const recetaId = versiones.find((v) => v.id === P.receta_version_id)?.receta_id;
-        await accion(P.id, 'publicar_formulacion', { version: `v${versiones.filter((v) => v.receta_id === recetaId).length + 1}` });
-        invalidateCat('versiones');
-        toast('Receta actualizada con la formulación aprobada.', 'success');
       } else return;
       ctx.refrescar();
     } catch (err) { toast(errMsg(err), 'error'); }
@@ -216,11 +185,10 @@ function imprimir(P, K, E) {
         <td>${f.ev ? esc(EVALUACION[f.ev.evaluacion][0]) : '—'}</td><td>${f.ev ? `${esc(f.ev.observaciones)}<br><span class="muted">${esc(f.ev.por?.nombre || '')}</span>` : ''}</td></tr>`).join('')}</table>
     <h2>5. Recomendaciones</h2><table class="t"><tr><th>Área</th><th>Sentido</th><th>Recomendación</th><th>Responsable</th></tr>
       ${areas.map((a) => { const r = REC.find((x) => x.area === a); return `<tr><td>${esc(AREAS[a].label)}</td><td>${r ? esc(VEREDICTO[r.sentido][0]) : 'Sin veredicto (no participó o pendiente)'}</td><td>${esc(r?.recomendacion || '')}</td><td>${esc(r?.por?.nombre || '')}</td></tr>`; }).join('')}</table>
-    <h2>6. Dictamen de Alta Dirección y cierre</h2><table>${fila('Dictamen', ult ? esc(`${DICT[ult.dictamen][0]} · ${ult.por?.nombre || ''} · ${fmtDateTime(ult.created_at)}${ult.motivo ? ` · ${ult.motivo.nombre}` : ''}${ult.descripcion ? ` · ${ult.descripcion}` : ''}`) : '—')}
+    <h2>6. Dictamen y aprobación de Alta Dirección, y cierre</h2><table>${fila('Dictamen', ult ? esc(`${DICT[ult.dictamen][0]} · ${ult.por?.nombre || ''} · ${fmtDateTime(ult.created_at)}${ult.motivo ? ` · ${ult.motivo.nombre}` : ''}${ult.descripcion ? ` · ${ult.descripcion}` : ''}`) : '—')}
       ${fila('Cierre', P.cerrada_at ? esc(`${P.cerrada_por_nombre} · ${fmtDateTime(P.cerrada_at)}`) : '—')}
-      ${fila('Autorización de implementación', K.A.filter((a) => a.tipo === 'implementacion').map((a) => esc(`${a.puesto?.nombre || ''}: ${a.por?.nombre} · ${fmtDateTime(a.created_at)}`)).join('<br>') || '—')}
       ${fila('Evidencia', esc(`${K.ADJ.length} archivo(s)`))}</table>
-    <p class="muted">La aprobación de una prueba no libera producto para comercialización ni autoriza por sí misma el cambio en producción.</p></body></html>`;
+    <p class="muted">Un dictamen "Aprobada" de Alta Dirección autoriza implementar el cambio evaluado.</p></body></html>`;
   const w = window.open('', '_blank');
   if (!w) { toast('Permita ventanas emergentes para imprimir el expediente.', 'warning'); return; }
   w.document.write(html); w.document.close();

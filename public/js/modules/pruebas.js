@@ -12,7 +12,7 @@ import {
   refreshIcons, navigate, bindCounters, prefs, fmtBytes, dayStartTs, dayEndTs, ayuda, avisar,
 } from '../core.js';
 import { box, txt, cardHead, btn, iconBtn, aviso, vacio, accion, subirEvidencia, abrirAdjunto } from './exp_comun.js';
-import { montarSelector, montarParametrosPrueba, montarFormulacion } from './exp_registro.js';
+import { montarSelector, montarParametrosPrueba } from './exp_registro.js';
 import { etapaProceso, etapaComplementarias } from './exp_ejec.js';
 import { etapaResultados, etapaRecomendaciones } from './exp_eval.js';
 import { etapaDictamen, etapaCierre } from './exp_dict.js';
@@ -148,9 +148,9 @@ const EJEMPLO_CAMBIO = {
   cambio_proceso: 'Ej. Aumentar el tiempo de cocción 5 minutos',
 };
 const PRIO = {
-  normal: ['Normal', 'Orden habitual'],
-  alta: ['Alta', 'Antes que las normales'],
-  urgente: ['Urgente', 'Atención inmediata'],
+  normal: ['Normal'],
+  alta: ['Alta'],
+  urgente: ['Urgente'],
 };
 // Catálogos que se pueden ampliar desde el propio menú
 const ALTA = {
@@ -206,8 +206,8 @@ export async function openRegistro(p = null) {
         <div class="field"><label for="rg-fecha">Fecha de ejecución</label><input id="rg-fecha" name="fecha_planeada" type="date" value="${esc(p?.fecha_planeada || '')}"></div>
 
         ${paso(2, 'Prioridad', 'Qué tan pronto debe atenderse')}
-        <div class="field full"><div class="prio-seg" role="radiogroup" aria-label="Prioridad">${Object.entries(PRIO).map(([k, [l, d]]) => `<label class="prio-${k}"><input type="radio" name="prioridad" value="${k}" ${k === (p?.prioridad || 'normal') ? 'checked' : ''}>
-          <span><i class="pdot"></i><b>${l}</b><small>${d}</small></span></label>`).join('')}</div></div>
+        <div class="field full"><div class="prio-seg" role="radiogroup" aria-label="Prioridad">${Object.entries(PRIO).map(([k, [l]]) => `<label class="prio-${k}"><input type="radio" name="prioridad" value="${k}" ${k === (p?.prioridad || 'normal') ? 'checked' : ''}>
+          <span><i class="pdot"></i><b>${l}</b></span></label>`).join('')}</div></div>
         <div class="field full hidden" id="rg-just-w"><label for="rg-just" id="rg-just-l">¿Por qué es alta? <span class="req">*</span></label><input id="rg-just" name="prioridad_just" maxlength="300" value="${esc(p?.prioridad_just || '')}"></div>
 
         ${p ? '' : `${paso(3, 'Parámetros a evaluar', 'Calidad, Producción, Seguridad y Mantenimiento; cada área define los suyos')}
@@ -284,10 +284,9 @@ export async function openRegistro(p = null) {
       if (p) { mustRow(await sb.from('pruebas_prubind').update(payload).eq('id', p.id).select('id')); toast('Registro actualizado.', 'success'); return true; }
       const { data } = must(await sb.from('pruebas_prubind').insert({ ...payload, tipo: v.tipo, registrado_por: state.profile.id }).select('id, folio').single());
       avisar('nueva_prueba', data.id);
-      // Parámetros del área de quien registra y, si aplica, copia de la receta para la formulación
+      // Parámetros del área de quien registra
       try {
         if (params.ids.length) must(await sb.rpc('prubind_definir_parametros', { p_prueba: data.id, p_agregar: params.ids, p_quitar: [] }));
-        if (payload.receta_version_id && (t?.secciones_prep || []).includes('formulacion')) await accion(data.id, 'copiar_receta');
       } catch (err) { toast(`Prueba ${data.folio} registrada, pero: ${errMsg(err)}. Revise los parámetros en el expediente.`, 'warning', 8000); return data.id; }
       toast(`Prueba registrada con folio ${data.folio}.`, 'success');
       return data.id;
@@ -376,11 +375,10 @@ function siguientePaso() {
   const msgs = {
     registrada: definir && !puedeEn(P, 'preparar') ? definir : registro, en_preparacion: registro, preparada: registro, en_ejecucion: proceso,
     en_evaluacion: evalua, pendiente_resultados: evalua,
-    pendiente_dictamen: ['Alta Dirección revisa los resultados y las recomendaciones, y emite el dictamen.', autoridad(P.tipo, 'dictaminar')],
+    pendiente_dictamen: ['Alta Dirección revisa los resultados y los veredictos de las áreas y emite el dictamen; si lo aprueba, queda autorizado implementar el cambio.', autoridad(P.tipo, 'dictaminar')],
     requiere_repeticion: ['Iniciar una nueva ejecución vinculada a este registro.', puedeEn(P, 'preparar') || autoridad(P.tipo, 'dictaminar')],
-    aprobada: ['Cerrar la prueba.', autoridad(P.tipo, 'cerrar')],
-    rechazada: ['Cerrar la prueba.', autoridad(P.tipo, 'cerrar')],
-    cerrada_aprobada: E.impl_requeridas > E.impl_obtenidas ? [`Autorizar la implementación del cambio (${E.impl_obtenidas} de ${E.impl_requeridas} autorizaciones).`, autoridad(P.tipo, 'autorizar_implementacion')] : null,
+    aprobada: ['Cerrar la prueba (Gerencia de Procesos y Mejora Continua). El cambio ya quedó autorizado en el dictamen.', autoridad(P.tipo, 'cerrar')],
+    rechazada: ['Cerrar la prueba (Gerencia de Procesos y Mejora Continua).', autoridad(P.tipo, 'cerrar')],
   }[e];
   if (!msgs) return '';
   return `<div class="next-step ${msgs[1] ? 'mine' : ''}">${icon(msgs[1] ? 'hand' : 'navigation')}<span><b>${msgs[1] ? 'Te corresponde:' : 'Siguiente paso:'}</b> ${esc(msgs[0])}</span></div>`;
@@ -500,10 +498,10 @@ async function tabRegistro(pane) {
       ${P.area_nombre ? box('Área que coordina', esc(P.area_nombre)) : ''}
       ${P.responsable_inicial_nombre ? box('Responsable de seguimiento', esc(P.responsable_inicial_nombre)) : ''}
     </div></div>
-    <div id="rg-par"></div><div id="rg-form"></div>`;
+    <div id="rg-par"></div>`;
   refreshIcons();
   const recargar = () => refrescar('registro');
-  await Promise.all([montarParametrosPrueba(pane.querySelector('#rg-par'), P, recargar), montarFormulacion(pane.querySelector('#rg-form'), P, recargar)]);
+  await montarParametrosPrueba(pane.querySelector('#rg-par'), P, recargar);
 }
 
 // ---------- Seguimiento ----------

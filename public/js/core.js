@@ -35,15 +35,16 @@ export const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_AN
 // El administrador gestiona catálogos y usuarios, pero NO tiene autoridad técnica:
 // la autoridad viene de la matriz puesto × tipo de prueba × acción.
 export const state = { session: null, profile: null, isAdmin: false };
-export const autoridad = (tipo, accion) => (state.profile?.autoridades || [])
+// El administrador puede hacer todo lo que hacen los responsables (igual que en el servidor)
+export const autoridad = (tipo, accion) => state.isAdmin || (state.profile?.autoridades || [])
   .some((a) => a.accion === accion && (!a.tipo || a.tipo === tipo));
-export const autoridadAlguna = (accion) => (state.profile?.autoridades || []).some((a) => a.accion === accion);
+export const autoridadAlguna = (accion) => state.isAdmin || (state.profile?.autoridades || []).some((a) => a.accion === accion);
 const yo = () => state.profile?.id;
 // Espejo de prubind_puede (servidor)
 export function puedeEn(p, accion) {
   if (!p || !yo()) return false;
   const persona = [p.registrado_por, p.responsable_inicial_id, p.responsable_ejecucion_id].includes(yo());
-  const prefijo = (pre) => (state.profile?.autoridades || []).some((a) => a.accion.startsWith(pre) && (!a.tipo || a.tipo === p.tipo));
+  const prefijo = (pre) => state.isAdmin || (state.profile?.autoridades || []).some((a) => a.accion.startsWith(pre) && (!a.tipo || a.tipo === p.tipo));
   switch (accion) {
     case 'preparar': return persona || autoridad(p.tipo, 'preparar');
     case 'abastecer': return autoridad(p.tipo, 'abastecer') || puedeEn(p, 'preparar');
@@ -101,12 +102,12 @@ export const ESTADOS_PRUEBA = {
   requiere_repeticion:  { label: 'Requiere repetición',      cls: 'warn',   etapa: 6 },
   cerrada_aprobada:     { label: 'Cerrada y aprobada',       cls: 'ok',     etapa: 8 },
   cerrada_rechazada:    { label: 'Cerrada y rechazada',      cls: 'bad',    etapa: 8 },
-  cancelada:            { label: 'Cancelada',                cls: 'gray',   etapa: 0 },
+  cancelada:            { label: 'Cancelada',                cls: 'bad',    etapa: 0 },
 };
 // Etapas según el flujo de información acordado (narración del 20/10/2026)
 export const ETAPAS = [['registro', 'Registro', 'clipboard-pen'], ['proceso', 'En proceso', 'factory'],
   ['complementarias', 'Evaluaciones complementarias', 'microscope'], ['resultados', 'Resultados', 'list-checks'],
-  ['recomendaciones', 'Recomendaciones', 'lightbulb'], ['dictamen', 'Dictamen', 'gavel'], ['cierre', 'Cierre', 'archive']];
+  ['recomendaciones', 'Recomendaciones', 'lightbulb'], ['dictamen', 'Dictamen y aprobación', 'gavel'], ['cierre', 'Cierre', 'archive']];
 // Las evaluaciones complementarias solo aplican a materia prima, reformulación y producto nuevo
 export const TIPOS_COMPLEMENTARIAS = ['producto_nuevo', 'cambio_formulacion', 'cambio_proveedor'];
 export const etapasDe = (tipo) => ETAPAS.filter(([k]) => k !== 'complementarias' || TIPOS_COMPLEMENTARIAS.includes(tipo));
@@ -144,7 +145,7 @@ export const DISPONIBILIDAD = {
   en_compra:     { label: 'En compra',     cls: 'orange' },
   no_disponible: { label: 'No disponible', cls: 'bad' },
 };
-export const PRIORIDADES = { normal: { label: 'Normal', cls: 'gray' }, alta: { label: 'Alta', cls: 'warn' }, urgente: { label: 'Urgente', cls: 'bad' } };
+export const PRIORIDADES = { normal: { label: 'Normal', cls: 'blue' }, alta: { label: 'Alta', cls: 'warn' }, urgente: { label: 'Urgente', cls: 'bad' } };
 export const NIVELES = { batch: 'Por batch', compuesta: 'Muestra compuesta', lote_diario: 'Por lote diario', corrida: 'Corrida / general', punto: 'Punto de muestreo' };
 export const CATEGORIAS = {
   fisicoquimica: 'Fisicoquímica', sensorial: 'Sensorial', microbiologia: 'Microbiología', bromatologia: 'Bromatología',
@@ -156,7 +157,7 @@ export const ACCIONES = {
   capturar_seguridad: 'Registrar parámetros de Seguridad', capturar_mantenimiento: 'Registrar parámetros de Mantenimiento',
   evaluar_calidad: 'Evaluar y recomendar · Calidad', evaluar_produccion: 'Evaluar y recomendar · Producción',
   evaluar_seguridad: 'Evaluar y recomendar · Seguridad', evaluar_mantenimiento: 'Evaluar y recomendar · Mantenimiento',
-  dictaminar: 'Dictaminar (Alta Dirección)', cerrar: 'Cerrar', autorizar_implementacion: 'Autorizar implementación',
+  dictaminar: 'Dictaminar (Alta Dirección)', cerrar: 'Cerrar',
 };
 export const CAMPOS_REGISTRO = { producto: 'Receta', receta: 'Receta', materia_prima: 'Materia prima', proveedor: 'Proveedor', empaque: 'Empaque', proceso: 'Proceso', equipo: 'Equipo' };
 export const SECCIONES_PREP = { batches: 'Batches planeados', peso: 'Peso objetivo', formulacion: 'Formulación', materiales: 'Materiales', equipos: 'Equipos y parámetros', muestreo: 'Plan de muestreo', vida_util: 'Puntos de vida útil' };

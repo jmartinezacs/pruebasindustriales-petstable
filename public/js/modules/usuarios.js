@@ -218,7 +218,7 @@ async function openUsuarioForm(u = null) {
           <select id="us-rol" name="rol" required ${self ? 'disabled' : ''}>
             <option value="usuario" ${u?.rol !== 'admin' ? 'selected' : ''}>Usuario — registra pruebas y actúa según su puesto</option>
             <option value="admin" ${u?.rol === 'admin' ? 'selected' : ''}>Administrador — catálogos, recetas, plantillas, usuarios y permisos técnicos</option></select>
-          <small class="hint">El rol de administrador no otorga autoridad para aprobar resultados ni cambios.</small></div>
+          <small class="hint">El rol de administrador puede hacer todo lo que hacen los responsables de Autoridades.</small></div>
       </div>
       ${u ? '' : `<div class="acc-box"><div class="section-title" style="margin:4px 0 6px">${icon('key-round')} Cuenta de acceso</div>
         <div id="us-acc"><span class="hint">Escribe el correo para verificar si ya tiene cuenta Pet's Table.</span></div></div>`}`,

@@ -87,8 +87,9 @@ export default {
         <div class="p-tile"><span class="ti">${icon('info')}</span><small>Versión del sistema</small><b>${esc(APP_VERSION)}</b></div>
       </div>
       <div class="card mt"><div class="card-head"><div><h3>Tus autoridades</h3><p>Además, siempre puedes registrar pruebas y preparar las que registraste o tienes asignadas.</p></div></div>
+        ${p.rol === 'admin' ? `<div class="notice">${icon('crown')}<span>Como <b>administrador</b> puedes realizar todas las acciones de las autoridades (definir, registrar, evaluar y dar veredicto por cualquier área, dictaminar y cerrar), por ejemplo para hacer pruebas o apoyar a un responsable.</span></div>` : ''}
         ${aut.length ? `<div class="list">${aut.map((a) => `<div class="list-item"><span class="pend-ico">${icon('key-round')}</span><div class="li-main"><b>${esc(a.lbl)}</b><span>${esc(a.tipos)}</span></div></div>`).join('')}</div>`
-          : `<p class="hint">${p.puesto ? 'Tu puesto no tiene autoridades asignadas.' : 'Aún no tienes puesto asignado.'} Un administrador las configura en Usuarios › Autoridades.${p.rol === 'admin' ? ' El rol de administrador no otorga autoridad técnica.' : ''}</p>`}</div>
+          : `<p class="hint">${p.puesto ? 'Tu puesto no tiene autoridades asignadas.' : 'Aún no tienes puesto asignado.'} Un administrador las configura en Usuarios › Autoridades.</p>`}</div>
       <div class="grid grid-2 mt">
         <div class="card">
           <div class="card-head"><div><h3>Cambiar contraseña</h3><p>Aplica a todas las aplicaciones de Pet's Table que usan esta cuenta.</p></div></div>

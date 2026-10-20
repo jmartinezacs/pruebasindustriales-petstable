@@ -15,9 +15,10 @@ const TAB_ACCION = { iniciar: 'proceso', definir: 'registro', capturar: 'proceso
 const ACC = {
   iniciar: ['Iniciar la prueba', 'play', 'Iniciar'], definir: ['Definir parámetros', 'list-plus', 'Definir'], capturar: ['Registrar parámetros', 'clipboard-pen', 'Registrar'],
   evaluar: ['Evaluar resultados', 'list-checks', 'Evaluar'], recomendar: ['Dar veredicto y recomendación', 'thumbs-up', 'Veredicto'],
-  dictaminar: ['Emitir dictamen', 'gavel', 'Dictamen'], cerrar: ['Cerrar la prueba', 'archive', 'Cerrar'], autorizar_implementacion: [ACCIONES.autorizar_implementacion, 'stamp', 'Autorizar'],
+  dictaminar: ['Emitir dictamen', 'gavel', 'Dictamen'], cerrar: ['Cerrar la prueba', 'archive', 'Cerrar'], autorizar_implementacion: ['Autorizar implementación', 'stamp', 'Autorizar'],
 };
 const PRIO_ORDEN = { urgente: 0, alta: 1, normal: 2 };
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 function periodRange(p, desde, hasta) {
   const hoy = todayISO();
@@ -182,7 +183,7 @@ function pintarPendientes() {
 }
 
 // ---------- Gráficas ----------
-const chartCard = (id, title, sub, cls = '', total = '') => `<div class="card chart-card"><div class="card-head chart-head"><div><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div>${total !== '' ? `<span class="chart-total">${total}</span>` : ''}</div><div class="chart-box ${cls}"><canvas id="${id}" role="img" aria-label="${esc(title)}"></canvas></div></div>`;
+const chartCard = (id, title, sub, cls = '', total = '') => `<div class="card chart-card"><div class="chart-head"><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}${total !== '' ? `<span class="chart-total">${total}</span>` : ''}</div><div class="chart-box ${cls}"><canvas id="${id}" role="img" aria-label="${esc(title)}"></canvas></div></div>`;
 function chartsHTML(k) {
   const hayActual = Object.values(k.actual || {}).some((n) => n > 0);
   if (!k.registradas && !hayActual) return `<div class="card mt">${emptyState({ ico: 'bar-chart-3', title: 'Aún no hay pruebas', text: 'Las gráficas aparecerán al registrar pruebas.' })}</div>`;
@@ -190,8 +191,8 @@ function chartsHTML(k) {
   const total = Object.values(k.actual || {}).reduce((s, n) => s + n, 0);
   const curso = ABIERTAS.reduce((s, e) => s + ((k.actual || {})[e] || 0), 0);
   return `<div class="section-label">Indicadores</div>
-    <div class="grid grid-main">${chartCard('ch-serie', 'Pruebas registradas y cerradas', k.por_mes ? 'Por mes, en el periodo' : 'Por día, en el periodo', '', `${fmtNum(k.registradas)} <small>registradas</small>`)}${chartCard('ch-estado', 'Situación de todas las pruebas', 'Todas las pruebas registradas', '', `${fmtNum(total)} <small>total</small>`)}</div>
-    <div class="grid grid-2 mt">${chartCard('ch-etapa', 'Pruebas en curso por etapa', 'Dónde están las pruebas abiertas', 'sm', `${fmtNum(curso)} <small>en curso</small>`)}${chartCard('ch-tipo', 'Pruebas registradas por tipo', 'En el periodo', 'sm', `${fmtNum(k.registradas)} <small>en el periodo</small>`)}</div>
+    <div class="grid grid-main">${chartCard('ch-serie', 'Pruebas registradas y cerradas', k.por_mes ? 'Por mes, en el periodo' : 'Por día, en el periodo', '', `${fmtNum(k.registradas)} <small>Registradas</small>`)}${chartCard('ch-estado', 'Situación de todas las pruebas', 'Todas las pruebas registradas', '', `${fmtNum(total)} <small>Total</small>`)}</div>
+    <div class="grid grid-2 mt">${chartCard('ch-etapa', 'Pruebas en curso por etapa', 'Dónde están las pruebas que no se han cerrado', 'sm', `${fmtNum(curso)} <small>En curso</small>`)}${chartCard('ch-tipo', 'Pruebas registradas por tipo', 'En el periodo', 'sm', `${fmtNum(k.registradas)} <small>En el periodo</small>`)}</div>
     <div class="mt">${ev ? chartCard('ch-areas', 'Evaluación de parámetros por área', 'Cumple / No cumple / No se pudo determinar, evaluados en el periodo', 'sm') : `<div class="card">${emptyState({ ico: 'list-checks', title: 'Sin parámetros evaluados en el periodo' })}</div>`}</div>`;
 }
 
@@ -231,7 +232,7 @@ function accesoHTML() {
       <div class="access-tags"><span>${icon(state.isAdmin ? 'crown' : 'user')} ${state.isAdmin ? 'Administrador del portal' : 'Usuario'}</span>
         ${acc.map((a) => `<span>${icon('key-round')} ${esc(a)}</span>`).join('')}
         <span>${icon('building-2')} ${esc(p.area || 'Sin área')}</span><span>${icon('clock')} Último acceso: ${fmtDateTime(u?.last_sign_in_at)}</span></div>
-      <p class="access-foot">${icon('lock')} ${state.isAdmin ? 'La administración del portal no otorga autoridad de aprobación técnica.' : 'Sesión verificada con tu cuenta corporativa Pet\'s Table.'}</p></div></section>`;
+      <p class="access-foot">${icon('lock')} ${state.isAdmin ? 'Como administrador puedes realizar cualquier acción de las autoridades.' : 'Sesión verificada con tu cuenta corporativa Pet\'s Table.'}</p></div></section>`;
 }
 
 // Estados (fijos, con etiqueta): cumple / no cumple / no determinado; situación de las pruebas
@@ -241,23 +242,24 @@ const ESTADO_COL = {
 const SITUACION = [['En curso', (e) => !['cerrada_aprobada', 'cerrada_rechazada', 'cancelada'].includes(e), 'curso'],
   ['Cerradas y aprobadas', (e) => e === 'cerrada_aprobada', 'cumple'], ['Cerradas y rechazadas', (e) => e === 'cerrada_rechazada', 'no_cumple'],
   ['Canceladas', (e) => e === 'cancelada', 'gris']];
-const ETAPA_DE = [['Registrada', ['registrada', 'en_preparacion', 'preparada']], ['En proceso', ['en_ejecucion']],
-  ['Evaluación por área', ['en_evaluacion', 'pendiente_resultados']], ['Dictamen', ['pendiente_dictamen', 'requiere_repeticion']], ['Por cerrar', ['aprobada', 'rechazada']]];
+const ETAPA_DE = [['Registradas', ['registrada', 'en_preparacion', 'preparada']], ['En proceso', ['en_ejecucion']],
+  ['En evaluación', ['en_evaluacion', 'pendiente_resultados']], ['Pendientes de dictamen', ['pendiente_dictamen', 'requiere_repeticion']], ['Por cerrar', ['aprobada', 'rechazada']]];
 function drawCharts(k) {
   const o = temaOscuro() ? 1 : 0;
   const ce = (n) => ESTADO_COL[n][o];
-  const fmtP = (p) => (k.por_mes ? `${monthShort(p + '-15')} ${p.slice(2, 4)}` : `${p.slice(8, 10)}/${p.slice(5, 7)}`);
+  // Sin abreviaturas: "Octubre 2026" por mes; "20/10/2026" por día
+  const fmtP = (p) => (k.por_mes ? `${MESES[Number(p.slice(5, 7)) - 1]} ${p.slice(0, 4)}` : `${p.slice(8, 10)}/${p.slice(5, 7)}/${p.slice(0, 4)}`);
   const s = k.serie || [];
   // Dos series: un color categórico por serie
   makeChart(document.getElementById('ch-serie'), { type: 'bar', data: { labels: s.map((x) => fmtP(x.periodo)), datasets: [
     { label: 'Registradas', data: s.map((x) => x.registradas), backgroundColor: colorCategoria(0), maxBarThickness: 34, categoryPercentage: 0.72, barPercentage: 0.92 },
     { label: 'Cerradas', data: s.map((x) => x.cerradas), backgroundColor: colorCategoria(1), maxBarThickness: 34, categoryPercentage: 0.72, barPercentage: 0.92 }] },
-    options: { plugins: { legend: { position: 'top', align: 'end' } } } });
+    options: { plugins: { legend: { position: 'top', align: 'center' } } } });
   const a = k.actual || {};
   const sit = SITUACION.map(([l, f, col]) => [l, Object.entries(a).filter(([e]) => f(e)).reduce((t, [, n]) => t + n, 0), col]).filter(([, n]) => n > 0);
   makeChart(document.getElementById('ch-estado'), { type: 'doughnut', data: { labels: sit.map(([l]) => l),
     datasets: [{ data: sit.map(([, n]) => n), backgroundColor: sit.map(([, , col]) => ce(col)) }] },
-    options: { plugins: { legend: { position: 'bottom' }, etiquetas: { centro: 'pruebas' } } } });
+    options: { plugins: { legend: { position: 'bottom' }, etiquetas: { centro: 'Pruebas' } } } });
   // Una barra por categoría: cada una con su color (en orden fijo de la paleta)
   const et = ETAPA_DE.map(([l, es]) => [l, es.reduce((t, e) => t + (a[e] || 0), 0)]);
   makeChart(document.getElementById('ch-etapa'), { type: 'bar', data: { labels: et.map(([l]) => l), datasets: [{ label: 'Pruebas', data: et.map(([, n]) => n),
@@ -270,5 +272,5 @@ function drawCharts(k) {
     { label: 'Cumple', data: ea.map((x) => x.cumple), backgroundColor: ce('cumple'), maxBarThickness: 28 },
     { label: 'No cumple', data: ea.map((x) => x.no_cumple), backgroundColor: ce('no_cumple'), maxBarThickness: 28 },
     { label: 'No se pudo determinar', data: ea.map((x) => x.no_determinado || 0), backgroundColor: ce('no_determinado'), etiquetaColor: '#1f1a0a', maxBarThickness: 28 }] },
-    options: { indexAxis: 'y', scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'top', align: 'end' } } } });
+    options: { indexAxis: 'y', scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'top', align: 'center' } } } });
 }

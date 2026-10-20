@@ -336,3 +336,13 @@ Migración `20261020001800_prubind_v5_inicio_areas_avisos.sql`; prueba SQL `test
 - **Notificaciones push** (mismo diseño que Servicio Médico: foto de quien genera el aviso con la insignia de la app): Edge Function `notificar_prubind`, `public/sw.js`, tablas `push_subs_prubind` y `avisos_prubind`, claves VAPID en `prubind_private.config_push`. Eventos: prueba registrada, prueba iniciada (áreas con autoridad de registrar o evaluar), lista para dictamen (Alta Dirección) y dictamen emitido (quien registró y las áreas). Se activan en Mi perfil o en el aviso del Panel; en iPhone requiere la app instalada.
 - **Publicación:** además de `index.html`, la raíz publica `sw.js`, `manifest.webmanifest`, `icon-512.png`, `notif-icon.png` y `notif-badge.png`.
 - **Panel:** "Requieren tu intervención" en tarjetas por prueba con lo que te toca (filtrables), gráficas con un color por barra o porción y etiquetas de datos, y actividad reciente como línea de tiempo por día.
+
+## v5.1 · Administrador, dictamen y aprobación, objetivos por tipo (20/10/2026)
+
+Migración `20261020001900_prubind_v51_admin_dictamen_objetivos.sql`.
+
+- **Administrador:** puede hacer todo lo que hacen los responsables de Autoridades (definir, registrar, evaluar y dar veredicto por cualquier área, dictaminar y cerrar). Los avisos push siguen llegando solo a los responsables asignados.
+- **Dictamen y aprobación en un solo paso:** el dictamen "Aprobada" de Alta Dirección autoriza implementar el cambio; después la Gerencia de Procesos y Mejora Continua cierra. La autorización de implementación separada se desactivó (los registros anteriores se conservan).
+- **Objetivos por tipo de prueba** (más "Cumplir un requisito de cliente o regulatorio" y "Otro"); los objetivos generales anteriores quedan inactivos.
+- Sin formulación en el Registro; prioridad solo "Normal / Alta / Urgente" (Normal en azul); "Cancelada" en rojo.
+- Gráficas: encabezados y totales centrados, meses sin abreviar y etapas Registradas, En proceso, En evaluación, Pendientes de dictamen y Por cerrar.
