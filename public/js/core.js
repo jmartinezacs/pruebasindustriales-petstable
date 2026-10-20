@@ -473,25 +473,105 @@ export function paged(q, { from, to, sort }, extraOrder = []) {
 // ---------- Gráficas ----------
 const charts = new Set();
 export function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+// ¿Tema oscuro? (para elegir los tonos validados de cada modo)
+export const temaOscuro = () => (cssVar('--card') || '#ffffff').toLowerCase() !== '#ffffff';
+const fmtEtiqueta = (v) => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 1 }).format(v);
+
+// Etiquetas de datos: valor al final de cada barra (dentro del segmento si es apilada)
+// y dentro de cada porción de la dona, con el total al centro.
+const etiquetasPlugin = {
+  id: 'etiquetas',
+  afterDatasetsDraw(chart, _args, opts) {
+    if (opts?.display === false) return;
+    const { ctx } = chart;
+    const text = cssVar('--text') || '#172431';
+    const dona = chart.config.type === 'doughnut';
+    const horizontal = chart.options.indexAxis === 'y';
+    const apilada = !dona && !!(chart.options.scales?.x?.stacked || chart.options.scales?.y?.stacked);
+    ctx.save();
+    ctx.font = '700 12px Inter, Segoe UI, system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    chart.data.datasets.forEach((ds, di) => {
+      const meta = chart.getDatasetMeta(di);
+      if (meta.hidden || meta.type === 'line') return;
+      const total = dona ? ds.data.reduce((s, v) => s + (Number(v) || 0), 0) : 0;
+      meta.data.forEach((el, i) => {
+        const v = Number(ds.data[i]);
+        if (!v || (dona && !chart.getDataVisibility(i))) return;
+        const txt = fmtEtiqueta(v);
+        const w = ctx.measureText(txt).width;
+        if (dona) {
+          if (v / total < 0.05) return;
+          const p = el.tooltipPosition();
+          ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+          ctx.fillText(txt, p.x, p.y);
+        } else if (apilada) {
+          const largo = horizontal ? Math.abs(el.x - el.base) : Math.abs(el.base - el.y);
+          if (largo < w + 10) return;
+          const p = el.getCenterPoint();
+          ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+          ctx.fillText(txt, p.x, p.y);
+        } else if (horizontal) {
+          ctx.fillStyle = text; ctx.textAlign = 'left';
+          ctx.fillText(txt, el.x + 6, el.y);
+        } else {
+          ctx.fillStyle = text; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+          ctx.fillText(txt, el.x, el.y - 4);
+          ctx.textBaseline = 'middle';
+        }
+      });
+    });
+    // Total al centro de la dona
+    if (dona && opts?.centro) {
+      const meta = chart.getDatasetMeta(0); const arc = meta.data[0];
+      if (arc) {
+        const total = chart.data.datasets[0].data.reduce((s, v) => s + (Number(v) || 0), 0);
+        ctx.textAlign = 'center'; ctx.fillStyle = text;
+        ctx.font = '800 26px Inter, Segoe UI, system-ui, sans-serif';
+        ctx.fillText(fmtEtiqueta(total), arc.x, arc.y - 8);
+        ctx.font = '600 11.5px Inter, Segoe UI, system-ui, sans-serif'; ctx.fillStyle = cssVar('--muted') || '#687B8C';
+        ctx.fillText(opts.centro, arc.x, arc.y + 14);
+      }
+    }
+    ctx.restore();
+  },
+};
+
 export function makeChart(canvas, config) {
   if (!window.Chart || !canvas) return null;
-  const muted = cssVar('--muted') || '#687B8C', line = cssVar('--line') || '#E3EAEF', text = cssVar('--text') || '#172431';
+  const muted = cssVar('--muted') || '#687B8C', line = cssVar('--line') || '#E3EAEF', text = cssVar('--text') || '#172431', card = cssVar('--card') || '#ffffff';
   window.Chart.defaults.font.family = 'Inter, Segoe UI, system-ui, sans-serif';
   window.Chart.defaults.color = muted;
+  const dona = config.type === 'doughnut';
+  const horizontal = config.options?.indexAxis === 'y';
+  const apilada = !!(config.options?.scales?.x?.stacked || config.options?.scales?.y?.stacked);
+  // Marcas: esquinas de 4 px y 2 px de separación (color de la superficie) entre rellenos
+  (config.data?.datasets || []).forEach((ds) => {
+    if (dona) Object.assign(ds, { borderWidth: 2, borderColor: card, hoverOffset: 6, ...ds });
+    else if ((ds.type || config.type) === 'bar') Object.assign(ds, { borderRadius: 4, borderSkipped: apilada ? false : 'start', ...(apilada ? { borderWidth: horizontal ? { right: 2 } : { top: 2 }, borderColor: card } : {}), ...ds });
+  });
+  const valor = horizontal ? 'x' : 'y', categoria = horizontal ? 'y' : 'x';
+  const ejes = dona ? {} : {
+    [categoria]: { grid: { display: false }, ticks: { color: muted, precision: 0, font: { weight: 600 } }, border: { display: false }, stacked: apilada },
+    // Los valores van como etiqueta sobre cada barra: el eje numérico sobra
+    [valor]: { display: false, grid: { color: line, drawTicks: false }, ticks: { color: muted, precision: 0 }, beginAtZero: true, stacked: apilada, grace: '14%' },
+  };
   const c = new window.Chart(canvas, {
     ...config,
+    plugins: [etiquetasPlugin, ...(config.plugins || [])],
     options: {
-      responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
+      responsive: true, maintainAspectRatio: false, animation: { duration: 450, easing: 'easeOutQuart' },
+      layout: { padding: dona ? 6 : { top: horizontal ? 4 : 18, right: horizontal ? 34 : 8 } },
+      interaction: { mode: dona ? 'nearest' : 'index', intersect: dona },
       plugins: {
-        legend: { labels: { color: text, boxWidth: 12, boxHeight: 12, usePointStyle: true }, ...(config.options?.plugins?.legend || {}) },
-        tooltip: { backgroundColor: '#102536', padding: 10, cornerRadius: 10 },
+        legend: { labels: { color: text, boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: 'circle', padding: 14, font: { weight: 600 } }, ...(config.options?.plugins?.legend || {}) },
+        tooltip: { backgroundColor: '#0D1B26', titleColor: '#EEF3F7', bodyColor: '#EEF3F7', padding: 12, cornerRadius: 10, boxPadding: 4, usePointStyle: true,
+          callbacks: dona ? { label: (it) => { const t = it.dataset.data.reduce((s, v) => s + (Number(v) || 0), 0); return ` ${it.label}: ${fmtEtiqueta(it.parsed)} (${t ? Math.round((it.parsed / t) * 100) : 0} %)`; } } : {} },
+        etiquetas: config.options?.plugins?.etiquetas || {},
       },
-      scales: config.type === 'doughnut' ? {} : {
-        x: { grid: { color: line, drawTicks: false }, ticks: { color: muted, precision: 0 }, border: { display: false }, ...(config.options?.scales?.x || {}) },
-        y: { grid: { color: line, drawTicks: false }, ticks: { color: muted, precision: 0 }, border: { display: false }, beginAtZero: true, ...(config.options?.scales?.y || {}) },
-      },
-      ...(config.options?.indexAxis ? { indexAxis: config.options.indexAxis } : {}),
-      ...(config.type === 'doughnut' ? { cutout: '64%' } : {}),
+      scales: Object.fromEntries(Object.entries(ejes).map(([k, v]) => [k, { ...v, ...(config.options?.scales?.[k] || {}) }])),
+      ...(horizontal ? { indexAxis: 'y' } : {}),
+      ...(dona ? { cutout: '62%' } : {}),
     },
   });
   charts.add(c);

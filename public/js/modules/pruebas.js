@@ -144,13 +144,13 @@ const EJEMPLO_CAMBIO = {
   producto_nuevo: 'Ej. Receta nueva de pavo con arroz',
   cambio_formulacion: 'Ej. Reducir 10 % el filete de pollo y aumentar el recorte',
   cambio_proveedor: 'Ej. Harina de arroz del proveedor alterno',
-  material_empaque: 'Ej. Film reciclable de 80 µm en la ULMA',
+  material_empaque: 'Ej. Film Chicken Chase formato 4x2',
   cambio_proceso: 'Ej. Aumentar el tiempo de cocción 5 minutos',
 };
 const PRIO = {
-  normal: ['Normal', 'Se programa en el orden habitual', 'circle-check'],
-  alta: ['Alta', 'Debe atenderse antes que las normales', 'circle-arrow-up'],
-  urgente: ['Urgente', 'Requiere atención inmediata', 'siren'],
+  normal: ['Normal', 'Orden habitual'],
+  alta: ['Alta', 'Antes que las normales'],
+  urgente: ['Urgente', 'Atención inmediata'],
 };
 // Catálogos que se pueden ampliar desde el propio menú
 const ALTA = {
@@ -159,12 +159,15 @@ const ALTA = {
   proveedor_id: { tipo: 'proveedor', cat: 'proveedores', opcion: 'Agregar proveedor nuevo…', campo: 'Nombre del proveedor', listo: 'Proveedor agregado.' },
 };
 const NUEVO = '__nuevo__';
+// Encabezado de cada bloque del formulario
+const paso = (n, titulo, sub, extra = '') => `<div class="fs-step full"><span class="fs-num">${n}</span><div><b>${esc(titulo)}</b><small>${esc(sub)}</small></div>${extra}</div>`;
+const esOtro = (o) => /^otro\b/i.test(o?.nombre || '');
 
 export async function openRegistro(p = null) {
   let c;
   try {
-    const [tipos, versiones, materias, proveedores, equipos] = await Promise.all(['tipos', 'versiones', 'materias', 'proveedores', 'equipos'].map((n) => getCat(n)));
-    c = { tipos, versiones, materias, proveedores, equipos };
+    const [tipos, versiones, materias, proveedores, objetivos] = await Promise.all(['tipos', 'versiones', 'materias', 'proveedores', 'objetivos'].map((n) => getCat(n)));
+    c = { tipos, versiones, materias, proveedores, objetivos };
   } catch (err) { toast(errMsg(err), 'error'); return false; }
   const tiposAct = c.tipos.filter((t) => t.activo || t.codigo === p?.tipo);
   const recetasDe = (vs) => vs.filter((v) => v.estado === 'vigente' || v.id === p?.receta_version_id).sort((a, b) => (a.receta?.nombre || '').localeCompare(b.receta?.nombre || ''));
@@ -174,42 +177,52 @@ export async function openRegistro(p = null) {
     proveedor_id: (sel) => opciones(c.proveedores.filter((m) => m.activo !== false || m.id === sel), sel, { vacio: 'Sin proveedor' }),
   };
   const conNuevo = (campo, sel) => `${optsDe[campo](sel)}<option value="${NUEVO}">➕ ${ALTA[campo].opcion}</option>`;
+  const objetivosDe = (tipo, sel) => {
+    const xs = c.objetivos.filter((o) => (o.activo && (!o.tipo || o.tipo === tipo)) || o.id === sel)
+      .sort((a, b) => Number(esOtro(a)) - Number(esOtro(b)) || (a.orden ?? 0) - (b.orden ?? 0));
+    return opciones(xs, sel, { vacio: 'Selecciona el objetivo…' });
+  };
   const ahora = new Intl.DateTimeFormat('es-MX', { dateStyle: 'long', timeStyle: 'short', timeZone: 'America/Mexico_City' }).format(new Date());
   let selector = null;
   return openModal({
     title: p ? `Editar registro ${p.folio}` : 'Nueva prueba industrial', size: 'lg', submitText: p ? 'Guardar cambios' : 'Registrar prueba',
     subtitle: p ? p.tipo_nombre : `Registra ${state.profile.nombre} · ${ahora.replace(/\.$/, '')}. El folio, la fecha y la hora se asignan al guardar.`,
     body: `<div class="form-grid">
-        <div class="form-section">${icon('flask-conical')} Datos de la prueba</div>
+        ${paso(1, 'Datos de la prueba', 'Qué se va a probar y para qué')}
         <div class="field full"><label for="rg-tipo">Tipo de prueba <span class="req">*</span></label>
           <select id="rg-tipo" name="tipo" required ${p ? 'disabled' : ''}>${opciones(tiposAct, p?.tipo, { value: (t) => t.codigo })}</select><small class="hint" id="rg-desc"></small></div>
         <div class="field full"><label for="rg-cam">Nombre de la prueba <span class="req">*</span> ${ayuda('Qué se va a probar, en pocas palabras.')}</label>
           <input id="rg-cam" name="cambio" required minlength="3" maxlength="500" value="${esc(p?.cambio || '')}"></div>
-        <div class="field full"><label for="rg-objd">Objetivo <span class="req">*</span> ${ayuda('Qué se desea evaluar con la prueba.')}</label>
-          <textarea id="rg-objd" name="objetivo_desc" required maxlength="500" rows="2" data-counter placeholder="Ej. Verificar que el cambio no afecte la merma, la consistencia ni la inocuidad">${esc(p?.objetivo_desc || '')}</textarea></div>
+        <div class="field full"><label for="rg-obj">Objetivo <span class="req">*</span> ${ayuda('Qué se desea evaluar con la prueba. El catálogo de objetivos se administra en Catálogos.')}</label>
+          <select id="rg-obj" name="objetivo_id" required>${objetivosDe(p?.tipo, p?.objetivo_id)}</select></div>
+        <div class="field full hidden" id="rg-objd-w"><label for="rg-objd">Describa el objetivo <span class="req">*</span></label>
+          <input id="rg-objd" name="objetivo_desc" maxlength="500" value="${esc(p?.objetivo_desc || '')}"></div>
         <div class="field" data-campo="receta"><label for="rg-rec">Receta <span class="req hidden" id="rg-rec-req">*</span> ${ayuda('Se usa la receta vigente. La prueba nunca modifica la receta oficial. Si no existe, elija «Agregar receta nueva».')}</label>
           <select id="rg-rec" name="receta_version_id">${conNuevo('receta_version_id', p?.receta_version_id)}</select></div>
         <div class="field" data-campo="materia_prima"><label for="rg-mp">Materia prima</label><select id="rg-mp" name="materia_prima_id">${conNuevo('materia_prima_id', p?.materia_prima_id)}</select></div>
         <div class="field" data-campo="proveedor"><label for="rg-prov">Proveedor</label><select id="rg-prov" name="proveedor_id">${conNuevo('proveedor_id', p?.proveedor_id)}</select></div>
-        <div class="field" data-campo="equipo"><label for="rg-eq">Equipo</label><select id="rg-eq" name="equipo_id">${opciones(c.equipos, p?.equipo_id, { vacio: 'Sin equipo' })}</select></div>
-        <div class="field" data-campo="empaque"><label for="rg-emp">Material de empaque a probar</label><input id="rg-emp" name="empaque" maxlength="200" value="${esc(p?.empaque || '')}" placeholder="Ej. Film PET/PE 80 µm"></div>
+        <div class="field" data-campo="empaque"><label for="rg-emp">Material de empaque a probar</label><input id="rg-emp" name="empaque" maxlength="200" value="${esc(p?.empaque || '')}" placeholder="Ej. Film Chicken Chase formato 4x2"></div>
         <div class="field" data-campo="proceso"><label for="rg-proc">Proceso que cambia</label><input id="rg-proc" name="proceso" maxlength="200" value="${esc(p?.proceso || '')}"></div>
         <div class="field"><label for="rg-fecha">Fecha de ejecución</label><input id="rg-fecha" name="fecha_planeada" type="date" value="${esc(p?.fecha_planeada || '')}"></div>
-        <div class="field" id="rg-nb-w"><label for="rg-nb">Número de batches para la prueba</label>
-          <input id="rg-nb" name="batches_planeados" type="number" min="1" max="500" step="1" inputmode="numeric" value="${esc(p?.batches_planeados ?? '')}"></div>
 
-        <div class="form-section">${icon('flag')} Prioridad</div>
-        <div class="field full"><div class="prio-cards" role="radiogroup" aria-label="Prioridad">${Object.entries(PRIO).map(([k, [l, d, ic]]) => `<label class="prio-${k}"><input type="radio" name="prioridad" value="${k}" ${k === (p?.prioridad || 'normal') ? 'checked' : ''}>
-          <span>${icon(ic)}<b>${l}</b><small>${d}</small></span></label>`).join('')}</div></div>
+        ${paso(2, 'Prioridad', 'Qué tan pronto debe atenderse')}
+        <div class="field full"><div class="prio-seg" role="radiogroup" aria-label="Prioridad">${Object.entries(PRIO).map(([k, [l, d]]) => `<label class="prio-${k}"><input type="radio" name="prioridad" value="${k}" ${k === (p?.prioridad || 'normal') ? 'checked' : ''}>
+          <span><i class="pdot"></i><b>${l}</b><small>${d}</small></span></label>`).join('')}</div></div>
         <div class="field full hidden" id="rg-just-w"><label for="rg-just" id="rg-just-l">¿Por qué es alta? <span class="req">*</span></label><input id="rg-just" name="prioridad_just" maxlength="300" value="${esc(p?.prioridad_just || '')}"></div>
 
-        ${p ? '' : `<div class="form-section">${icon('list-checks')} Parámetros a evaluar ${ayuda('Calidad y Producción participan siempre. Seguridad y Mantenimiento solo si la prueba los involucra; si no registran su parte, la prueba sigue avanzando.')}</div>
+        ${p ? '' : `${paso(3, 'Parámetros a evaluar', 'Calidad, Producción, Seguridad y Mantenimiento; cada área define los suyos')}
         <div class="full" id="rg-params"></div>`}
       </div>`,
     onOpen: ({ form }) => {
       bindCounters(form);
       const tipoSel = () => p?.tipo || form.elements.tipo.value;
       if (!p) selector = montarSelector(form.querySelector('#rg-params'), { getTipo: tipoSel, puedeDefinir: (area) => autoridad(tipoSel(), `evaluar_${area}`) });
+      const objetivo = () => {
+        const o = c.objetivos.find((x) => x.id === form.elements.objetivo_id.value);
+        const otro = esOtro(o);
+        form.querySelector('#rg-objd-w').classList.toggle('hidden', !otro);
+        form.elements.objetivo_desc.required = otro;
+      };
       const sync = () => {
         const t = c.tipos.find((x) => x.codigo === tipoSel());
         const campos = t?.campos_registro || [];
@@ -218,9 +231,10 @@ export async function openRegistro(p = null) {
         const recObl = t?.codigo === 'cambio_formulacion';
         form.querySelector('#rg-rec-req').classList.toggle('hidden', !recObl);
         form.elements.receta_version_id.required = recObl && campos.includes('receta');
-        form.querySelector('#rg-nb-w').classList.toggle('hidden', t?.ejecucion_form !== 'fabricacion');
         form.elements.cambio.placeholder = EJEMPLO_CAMBIO[t?.codigo] || 'Describa brevemente qué se va a probar';
-        if (!p && t?.equipo_id && !form.elements.equipo_id.value) form.elements.equipo_id.value = t.equipo_id;
+        const actual = form.elements.objetivo_id.value;
+        form.elements.objetivo_id.innerHTML = objetivosDe(t?.codigo, actual);
+        objetivo();
         selector?.recargar();
       };
       const prio = () => {
@@ -229,6 +243,7 @@ export async function openRegistro(p = null) {
         form.querySelector('#rg-just-l').firstChild.textContent = v === 'urgente' ? '¿Por qué es urgente? ' : '¿Por qué es alta? ';
       };
       form.elements.tipo.addEventListener('change', sync); sync();
+      form.elements.objetivo_id.addEventListener('change', objetivo);
       form.querySelectorAll('input[name=prioridad]').forEach((r) => r.addEventListener('change', prio)); prio();
       // "Agregar … nuevo" desde el menú
       Object.keys(ALTA).forEach((campo) => {
@@ -243,9 +258,8 @@ export async function openRegistro(p = null) {
           if (!r) { sel.value = previo; return; }
           try {
             const { data: id } = must(await sb.rpc('prubind_alta_rapida', { p_tipo: A.tipo, p_nombre: r.value }));
-            const cat = A.cat;
-            invalidateCat(cat); if (campo === 'receta_version_id') invalidateCat('productos');
-            c[cat] = await getCat(cat, { force: true });
+            invalidateCat(A.cat); if (campo === 'receta_version_id') invalidateCat('productos');
+            c[A.cat] = await getCat(A.cat, { force: true });
             sel.innerHTML = conNuevo(campo, id); sel.value = id; previo = id;
             toast(A.listo, 'success');
           } catch (err) { toast(errMsg(err), 'error'); sel.value = previo; }
@@ -258,21 +272,20 @@ export async function openRegistro(p = null) {
       const v = formValues(form);
       const t = c.tipos.find((x) => x.codigo === (p?.tipo || v.tipo));
       const campo = (k, val) => ((t?.campos_registro || []).includes(k) && val !== NUEVO ? nullIfEmpty(val) : null);
+      const obj = c.objetivos.find((x) => x.id === v.objetivo_id);
       const params = selector?.leer();
       const payload = {
-        objetivo_desc: nullIfEmpty(v.objetivo_desc), cambio: v.cambio.trim(),
+        objetivo_id: nullIfEmpty(v.objetivo_id), objetivo_desc: esOtro(obj) ? nullIfEmpty(v.objetivo_desc) : null, cambio: v.cambio.trim(),
         prioridad, prioridad_just: prioridad === 'normal' ? null : v.prioridad_just,
         receta_version_id: campo('receta', v.receta_version_id), materia_prima_id: campo('materia_prima', v.materia_prima_id),
-        proveedor_id: campo('proveedor', v.proveedor_id), equipo_id: campo('equipo', v.equipo_id), empaque: campo('empaque', v.empaque), proceso: campo('proceso', v.proceso),
+        proveedor_id: campo('proveedor', v.proveedor_id), empaque: campo('empaque', v.empaque), proceso: campo('proceso', v.proceso),
         fecha_planeada: nullIfEmpty(v.fecha_planeada),
-        batches_planeados: t?.ejecucion_form === 'fabricacion' && v.batches_planeados ? Number(v.batches_planeados) : null,
       };
       if (p) { mustRow(await sb.from('pruebas_prubind').update(payload).eq('id', p.id).select('id')); toast('Registro actualizado.', 'success'); return true; }
-      const { data } = must(await sb.from('pruebas_prubind').insert({ ...payload, tipo: v.tipo, registrado_por: state.profile.id, areas_involucradas: params.involucradas }).select('id, folio').single());
-      // Parámetros del área de quien registra y, si aplica, parámetros del equipo y copia de la receta
+      const { data } = must(await sb.from('pruebas_prubind').insert({ ...payload, tipo: v.tipo, registrado_por: state.profile.id }).select('id, folio').single());
+      // Parámetros del área de quien registra y, si aplica, copia de la receta para la formulación
       try {
         if (params.ids.length) must(await sb.rpc('prubind_definir_parametros', { p_prueba: data.id, p_agregar: params.ids, p_quitar: [] }));
-        if (payload.equipo_id) await accion(data.id, 'cargar_equipo');
         if (payload.receta_version_id && (t?.secciones_prep || []).includes('formulacion')) await accion(data.id, 'copiar_receta');
       } catch (err) { toast(`Prueba ${data.folio} registrada, pero: ${errMsg(err)}. Revise los parámetros en el expediente.`, 'warning', 8000); return data.id; }
       toast(`Prueba registrada con folio ${data.folio}.`, 'success');
@@ -280,6 +293,7 @@ export async function openRegistro(p = null) {
     },
   });
 }
+
 
 // ============================== EXPEDIENTE ==============================
 async function cargar(id) {
@@ -458,7 +472,7 @@ async function tabRegistro(pane) {
       ${(P.campos_registro || []).map((k) => box(CAMPOS_REGISTRO[k], esc({ producto: P.receta_nombre || P.producto_nombre, receta: P.receta_nombre,
         materia_prima: P.materia_prima_nombre, proveedor: P.proveedor_nombre, empaque: P.empaque, proceso: P.proceso, equipo: P.equipo_nombre }[k] || '—'))).join('')}
       ${box('Fecha de ejecución', P.fecha_planeada ? fmtDate(P.fecha_planeada) : '—')}
-      ${P.ejecucion_form === 'fabricacion' ? box('Número de batches para la prueba', esc(P.batches_planeados ?? '—')) : ''}
+      ${P.batches_planeados ? box('Número de batches planeado', esc(P.batches_planeados)) : ''}
       ${box('Prioridad', `${prioPill(P.prioridad)}${P.prioridad_just ? `<div class="cell-sub">${esc(P.prioridad_just)}</div>` : ''}`)}
       ${box('Registró', `<div class="user-cell">${avatarHTML(P.registrado_por_nombre, P.registrado_por_foto, 'sm')}<span>${esc(P.registrado_por_nombre)}<br><span class="cell-sub">${fmtDateTime(P.created_at)}</span></span></div>`)}
       ${P.area_nombre ? box('Área que coordina', esc(P.area_nombre)) : ''}

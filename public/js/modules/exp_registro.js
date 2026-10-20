@@ -12,9 +12,8 @@ import {
 } from '../core.js';
 import { cardHead, btn, iconBtn, aviso, vacio, accion, criterioTxt } from './exp_comun.js';
 
-const OPCIONALES = ['seguridad', 'mantenimiento'];
+// Todas las áreas participan siempre; Seguridad y Mantenimiento no detienen la prueba si no registran su parte
 const ABIERTA = ['registrada', 'en_preparacion', 'preparada', 'en_ejecucion'];
-const PREGUNTA = { seguridad: '¿La prueba involucra temas de seguridad (riesgo para el personal, EPP)?', mantenimiento: '¿La prueba involucra máquinas o equipos?' };
 export const esCompl = (m) => COMPLEMENTARIAS.includes(m?.categoria);
 
 // Cómo se mide un parámetro (texto corto)
@@ -92,12 +91,11 @@ export function montarSelector(cont, { getTipo, puedeDefinir }) {
     };
     cont.innerHTML = AREAS_ORDEN.map((area) => {
       const A = AREAS[area];
-      const opcional = OPCIONALES.includes(area);
-      const involucrada = !opcional || activas.has(area);
+      const involucrada = true;
       const propia = puedeDefinir(area);
       const cabeza = `<div class="area-head">${icon(A.ico)}<div><b>${esc(A.label)}</b><span>${esc(A.desc)}</span></div>
-        ${opcional ? '' : `<span class="area-tag">Siempre participa</span>`}</div>`;
-      const toggle = opcional ? `<label class="check area-toggle"><input type="checkbox" data-toggle="${area}" ${involucrada ? 'checked' : ''}> ${esc(PREGUNTA[area])}</label>` : '';
+        </div>`;
+      const toggle = '';
       if (!propia) {
         return `<div class="area-block ${involucrada ? '' : 'off'}" data-area="${area}">${cabeza}${toggle}
           ${involucrada ? `<p class="hint area-nota">${icon('info')} ${esc(A.label)} define sus propios parámetros desde la prueba, una vez registrada.</p>` : ''}</div>`;
@@ -159,7 +157,7 @@ export function montarSelector(cont, { getTipo, puedeDefinir }) {
         if (blk.querySelector('.area-list')?.classList.contains('hidden')) return;
         ids.push(...[...blk.querySelectorAll('.chk-param input:checked')].map((i) => i.value));
       });
-      return { ids, involucradas: ['calidad', 'produccion', ...activas] };
+      return { ids, involucradas: [...AREAS_ORDEN] };
     },
   };
 }
@@ -184,14 +182,14 @@ export async function montarParametrosPrueba(el, P, recargar) {
   plan.data.forEach((pl) => { const m = met(pl.metodo_id); if (m) (porArea[m.area] ||= []).push({ pl, m }); });
   const involucradas = new Set([...(P.areas_involucradas || ['calidad', 'produccion']), ...Object.keys(porArea), ...(pars.data.length ? ['produccion'] : [])]);
   const areas = AREAS_ORDEN.filter((a) => involucradas.has(a));
-  const sumables = OPCIONALES.filter((a) => !involucradas.has(a) && (registra || editaArea(a)));
+  const sumables = [];
   const crit = (pl, m) => criterioTxt(pl, unidadTxt(unidades, m.unidad_id));
   const item = ({ pl, m }, area) => `<li><span>${esc(m.nombre)} <span class="cell-sub">· ${esc(medidaTxt(m, unidades))}${crit(pl, m) ? ` · criterio ${esc(crit(pl, m))}` : ''}</span></span>
     ${editaArea(area) && !usados.has(pl.id) ? iconBtn(`data-par="quitar" data-id="${esc(pl.id)}" data-nom="${esc(m.nombre)}"`, 'x', 'Quitar parámetro', 'bad') : ''}</li>`;
-  el.innerHTML = `<div class="card mt">${cardHead('Parámetros a evaluar', 'Cada área define los parámetros que le corresponden. Seguridad y Mantenimiento participan solo si la prueba los involucra.')}
+  el.innerHTML = `<div class="card mt">${cardHead('Parámetros a evaluar', 'Cada área define los parámetros que le corresponden.')}
     <div class="areas-grid">${areas.map((area) => {
       const xs = porArea[area] || [], proc = xs.filter((x) => !esCompl(x.m)), compl = xs.filter((x) => esCompl(x.m));
-      const opcional = OPCIONALES.includes(area);
+      const opcional = false;
       const sinDefinir = !xs.length && !(area === 'produccion' && pars.data.length);
       return `<div class="area-block"><div class="area-head">${icon(AREAS[area].ico)}<div><b>${esc(AREAS[area].label)}</b><span>${esc(AREAS[area].desc)}</span></div>
           ${opcional ? '<span class="area-tag opt">Opcional</span>' : ''}</div>
@@ -200,8 +198,7 @@ export async function montarParametrosPrueba(el, P, recargar) {
         ${compl.length ? `<div class="sub-title">Evaluaciones complementarias</div><ul class="param-list">${compl.map((x) => item(x, area)).join('')}</ul>` : ''}
         ${area === 'produccion' && pars.data.length ? `<div class="sub-title">Parámetros del equipo (${esc(P.equipo_nombre || 'equipo')})</div><ul class="param-list">${pars.data.map((x) =>
           `<li><span>${esc(x.nombre)} <span class="cell-sub">· ${esc(x.minimo != null || x.maximo != null ? criterioTxt({ crit_minimo: x.minimo, crit_maximo: x.maximo }, unidadTxt(unidades, x.unidad_id)) : (x.referencia || '').split(' · ')[0] || 'referencia del equipo')}</span></span></li>`).join('')}</ul>` : ''}
-        <div class="area-acts">${editaArea(area) ? `<button type="button" class="${sinDefinir ? 'btn primary sm' : 'link-btn'}" data-par="${sinDefinir ? 'definir' : 'agregar'}" data-area="${area}">${icon(sinDefinir ? 'list-checks' : 'plus')} ${sinDefinir ? 'Definir parámetros' : 'Agregar parámetro'}</button>` : ''}
-          ${opcional && registra && !xs.length ? `<button type="button" class="link-btn danger-text" data-par="excluir" data-area="${area}">${icon('x')} No involucra ${esc(AREAS[area].label)}</button>` : ''}</div></div>`;
+        <div class="area-acts">${editaArea(area) ? `<button type="button" class="${sinDefinir ? 'btn primary sm' : 'link-btn'}" data-par="${sinDefinir ? 'definir' : 'agregar'}" data-area="${area}">${icon(sinDefinir ? 'list-checks' : 'plus')} ${sinDefinir ? 'Definir parámetros' : 'Agregar parámetro'}</button>` : ''}</div></div>`;
     }).join('')}</div>
     ${sumables.length ? `<p class="hint mt-s">¿La prueba involucra otra área? ${sumables.map((a) => `<button type="button" class="link-btn" data-par="incluir" data-area="${a}">${icon('plus')} ${esc(AREAS[a].label)}</button>`).join(' ')}</p>` : ''}
   </div>`;

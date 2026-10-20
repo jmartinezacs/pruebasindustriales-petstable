@@ -37,7 +37,7 @@ export async function consolidarResultados(P, ej = P.ejecucion_actual) {
     const R = res.data.filter((r) => r.plan_id === pl.id && (r.valor_num != null || r.valor_opcion));
     const valores = R.map((r) => {
       const v = r.valor_opcion ? (OPCIONES_TXT[r.valor_opcion] || r.valor_opcion) : `${r.valor_num}${r.unidad ? ` ${r.unidad}` : ''}`;
-      const donde = r.batch_numero ? `B${r.batch_numero}${r.dilucion ? ` ${r.dilucion}` : ''}` : r.dilucion || '';
+      const donde = `${r.batch_numero ? `${P.ejecucion_form === 'fabricacion' ? 'Batch' : 'Corrida'} ${r.batch_numero}` : 'General'}${r.dilucion ? ` · ${r.dilucion}` : ''}`;
       return { txt: donde ? `${donde}: ${v}` : v, fuera: r.estado === 'no_conforme', just: r.justificacion };
     });
     filas.push({ key: `pl:${pl.id}`, plan_id: pl.id, area: m.area, compl: COMPLEMENTARIAS.includes(m.categoria), nombre: m.nombre,
@@ -89,7 +89,7 @@ export async function etapaResultados(pane, ctx) {
       const fs = K.filas.filter((f) => f.area === a); const proc = fs.filter((f) => !f.compl), compl = fs.filter((f) => f.compl);
       const total = fs.filter((f) => f.requerida).length; const falta = K.faltan(a);
       return `<form class="card mt area-eval" data-area="${a}" novalidate>
-        ${cardHead(`${AREAS[a].label}`, `${total - falta} de ${total} evaluados${AREAS_OBLIGATORIAS.includes(a) ? '' : ' · área opcional: si no se evalúa, la prueba sigue avanzando'}`,
+        ${cardHead(`${AREAS[a].label}`, `${total - falta} de ${total} evaluados${AREAS_OBLIGATORIAS.includes(a) ? '' : ' · si no se evalúa, la prueba sigue avanzando'}`,
           puedeEv(a) && fs.some((f) => f.conValor && !f.ev) ? `<button type="button" class="btn ghost sm" data-re="todo-cumple">${icon('check-check')} Marcar pendientes como Cumple</button>` : '')}
         ${proc.length ? tabla(proc) : ''}
         ${compl.length ? `<div class="section-title">${icon('microscope')} Evaluaciones complementarias</div>${tabla(compl)}` : ''}
@@ -141,7 +141,7 @@ export async function etapaRecomendaciones(pane, ctx) {
   const { P } = ctx;
   const K = await consolidarResultados(P);
   const enEval = EVALUA.includes(P.estado);
-  const lista = K.areas.map((a) => [!!K.REC.find((r) => r.area === a), AREAS_OBLIGATORIAS.includes(a) ? AREAS[a].label : `${AREAS[a].label} (opcional: no detiene la prueba)`]);
+  const lista = K.areas.map((a) => [!!K.REC.find((r) => r.area === a), AREAS_OBLIGATORIAS.includes(a) ? AREAS[a].label : `${AREAS[a].label} (no detiene la prueba)`]);
   const completo = AREAS_OBLIGATORIAS.filter((a) => K.areas.includes(a)).every((a) => K.faltan(a) === 0 && K.REC.some((r) => r.area === a)) && K.areas.some((a) => AREAS_OBLIGATORIAS.includes(a));
 
   const tarjeta = (a) => {
@@ -163,7 +163,7 @@ export async function etapaRecomendaciones(pane, ctx) {
     } else if (falta) {
       cuerpo = aviso(`Primero se evalúan los resultados del área (${falta} por evaluar).`, '', 'list-checks');
     } else cuerpo = vacio(`Pendiente: la registra el responsable de ${AREAS[a].label}.${AREAS_OBLIGATORIAS.includes(a) ? "" : " Si no la registra, la prueba sigue avanzando."}`);
-    return `<div class="card mt"><div class="card-head"><div><h3>${icon(AREAS[a].ico)} ${esc(AREAS[a].label)}</h3><p>${esc(AREAS[a].desc)}</p></div>${r ? pill('Registrada', 'ok') : AREAS_OBLIGATORIAS.includes(a) ? pill('Pendiente', 'warn') : pill('Opcional', 'gray')}</div>
+    return `<div class="card mt"><div class="card-head"><div><h3>${icon(AREAS[a].ico)} ${esc(AREAS[a].label)}</h3><p>${esc(AREAS[a].desc)}</p></div>${r ? pill('Registrada', 'ok') : AREAS_OBLIGATORIAS.includes(a) ? pill('Pendiente', 'warn') : pill('Sin registrar', 'gray')}</div>
       ${resumen}${cuerpo}</div>`;
   };
 

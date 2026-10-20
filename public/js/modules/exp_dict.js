@@ -48,7 +48,7 @@ function resumenHTML(P, K, ej) {
       ${box('Parámetros que no cumplen', nc.length ? nc.map((f) => `<div class="nc-line"><b>${esc(f.nombre)}</b> (${esc(AREAS[f.area].label)})${f.criterio ? ` · criterio ${esc(f.criterio)}` : ''}<br><span class="cell-sub">${f.valores.map((v) => esc(v.txt)).join(' · ')}</span><br>${esc(f.ev.observaciones)}</div>`).join('') : '<span class="ok-txt">Todos cumplen</span>', true)}
       ${sinEval.length ? box('Sin evaluar', sinEval.map((f) => esc(f.nombre)).join(', '), true) : ''}
       ${box('Recomendaciones de las áreas', areas.map((a) => { const r = REC.find((x) => x.area === a);
-        return `<div class="nc-line"><b>${esc(AREAS[a].label)}</b>: ${r ? `${pill(SENTIDO[r.sentido][0], SENTIDO[r.sentido][1])} ${esc(r.recomendacion)} <span class="cell-sub">· ${esc(r.por?.nombre || '')}</span>` : AREAS_OBLIGATORIAS.includes(a) ? '<span class="warn-txt">Pendiente</span>' : '<span class="cell-sub">No registró su parte (área opcional)</span>'}</div>`; }).join('') || '—', true)}
+        return `<div class="nc-line"><b>${esc(AREAS[a].label)}</b>: ${r ? `${pill(SENTIDO[r.sentido][0], SENTIDO[r.sentido][1])} ${esc(r.recomendacion)} <span class="cell-sub">· ${esc(r.por?.nombre || '')}</span>` : AREAS_OBLIGATORIAS.includes(a) ? '<span class="warn-txt">Pendiente</span>' : '<span class="cell-sub">No registró su parte</span>'}</div>`; }).join('') || '—', true)}
       ${box('Evidencia adjunta', K.ADJ.length ? `${K.ADJ.length} archivo(s): ${K.ADJ.slice(0, 6).map((a) => esc(a.tipo?.nombre || a.nombre)).join(', ')}${K.ADJ.length > 6 ? '…' : ''}` : '<span class="cell-sub">Sin evidencia adjunta</span>', true)}
     </div>`;
 }

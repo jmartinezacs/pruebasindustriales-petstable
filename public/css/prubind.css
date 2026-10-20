@@ -403,3 +403,58 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
   .update-bar { left: 12px; right: 12px; transform: none; max-width: none; bottom: auto; top: calc(var(--header-h, 64px) + 8px + env(safe-area-inset-top)); border-radius: 16px; padding: 8px 8px 8px 12px; font-size: 12.5px; }
   .update-bar > span { flex: 1 1 auto; min-width: 0; }
 }
+
+/* v4.2 · Registro flexible (toda la prueba / por batch) */
+.unit-list { display: grid; gap: 8px; }
+.unit-row { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.unit-row .li-main { flex: 1 1 auto; min-width: 0; }
+.unit-row .li-main > b { display: block; font-size: 14px; }
+.unit-row .li-main > span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.unit-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.unit-chips .chip { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); border: 1px solid var(--line); }
+.unit-chips .chip.on { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-line); }
+.unit-chips .chip b { font-weight: 900; }
+.unit-hint { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: var(--muted); background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; margin: 0 0 12px; }
+.unit-hint svg { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 1px; color: var(--orange); }
+.av-list { display: grid; gap: 10px; margin-bottom: 12px; }
+.av-row { display: grid; grid-template-columns: minmax(110px, auto) 1fr auto; align-items: center; gap: 10px; font-size: 13px; }
+.av-row span { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.av-row span svg { width: 15px; height: 15px; color: var(--orange); }
+.av-bar { height: 8px; border-radius: 99px; background: var(--soft); overflow: hidden; }
+.av-bar i { display: block; height: 100%; border-radius: 99px; background: var(--ok); }
+@media (max-width: 600px) {
+  .unit-row { flex-wrap: wrap; }
+  .unit-row .row-actions { width: 100%; justify-content: flex-end; }
+}
+
+/* v4.2 · Encabezados de pasos y prioridad del registro */
+.fs-step { display: flex; align-items: center; gap: 12px; padding: 4px 0 2px; margin-top: 6px; border-top: 1px solid var(--line); padding-top: 16px; }
+.fs-step:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.fs-num { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-weight: 900; font-size: 14px; color: #fff; background: linear-gradient(135deg, #F58020, #E8650A); flex: 0 0 auto; box-shadow: 0 4px 10px rgba(245, 128, 32, .28); }
+.fs-step b { display: block; font-size: 15px; color: var(--text); }
+.fs-step small { display: block; font-size: 12px; color: var(--muted); }
+.prio-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 14px; background: var(--soft); border: 1px solid var(--line); }
+.prio-seg label { position: relative; margin: 0; cursor: pointer; }
+.prio-seg input { position: absolute; opacity: 0; pointer-events: none; }
+.prio-seg span { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; padding: 10px 12px; border-radius: 10px; transition: background .15s, box-shadow .15s; }
+.prio-seg .pdot { grid-row: span 2; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--muted); box-sizing: border-box; }
+.prio-seg b { font-size: 13.5px; color: var(--text); }
+.prio-seg small { font-size: 11px; color: var(--muted); }
+.prio-seg input:focus-visible + span { box-shadow: 0 0 0 3px rgba(245, 128, 32, .3); }
+.prio-seg input:checked + span { background: var(--card); box-shadow: 0 2px 8px rgba(0, 0, 0, .10); }
+.prio-seg .prio-normal input:checked + span .pdot { background: var(--ok); border-color: var(--ok); }
+.prio-seg .prio-alta input:checked + span .pdot { background: var(--warn); border-color: var(--warn); }
+.prio-seg .prio-urgente input:checked + span .pdot { background: var(--bad); border-color: var(--bad); box-shadow: 0 0 0 4px var(--bad-bg); }
+.prio-seg .prio-urgente input:checked + span b { color: var(--bad); }
+@media (max-width: 520px) {
+  .prio-seg span { grid-template-columns: auto 1fr; padding: 8px; }
+  .prio-seg small { display: none; }
+}
+
+/* v4.2 · Colores de los indicadores del panel */
+.kpi.i-green .kpi-ico { background: linear-gradient(135deg, #16A34A, #4ADE80) !important; }
+.kpi.i-yellow .kpi-ico { background: linear-gradient(135deg, #EAB308, #FDE047) !important; }
+.kpi.i-orange .kpi-ico { background: linear-gradient(135deg, #EA580C, #FB923C) !important; }
+.kpi.i-red .kpi-ico { background: linear-gradient(135deg, #DC2626, #F87171) !important; }
+.kpi.k-green::before { background: #16A34A; } .kpi.k-yellow::before { background: #EAB308; }
+.kpi.k-orange::before { background: #EA580C; } .kpi.k-red::before { background: #DC2626; }

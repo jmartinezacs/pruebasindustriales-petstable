@@ -314,3 +314,13 @@ Según la narración del usuario: **Registro → Registro en proceso → Evaluac
 - **Alta rápida** de receta, materia prima y proveedor desde los menús del registro (`prubind_alta_rapida`).
 - **Salmonella 25 g (PCR)** y **E. coli O157 (PCR)**: ausencia / presencia.
 - Migración `20261020001600_prubind_v41_areas_y_catalogos.sql`.
+
+## v4.2 · Registro flexible y panel (20/10/2026)
+
+- **Registro:** objetivo desde el catálogo de objetivos (con «Otro (describir)»); sin número de batches; sin campo de equipo; ejemplo de empaque «Film Chicken Chase formato 4x2»; encabezados numerados y prioridad en control segmentado.
+- **Seguridad y Mantenimiento participan siempre**, con parámetros propios (EPP, riesgos, condiciones seguras, incidentes, LOTO, señalización, ergonomía, orden y limpieza, residuos; funcionamiento del equipo, paros no programados, ruidos/vibraciones, tiempo de ajuste, desgaste, fugas). Para avanzar a dictamen siguen bastando Calidad y Producción.
+- **ULMA** (termoformado 95–100 °C, termosellado 135–145 °C, avance ref. 299.8 mm) pasa a parámetros de Mantenimiento en «Material de empaque».
+- **Registro durante el proceso flexible:** cada parámetro se registra para *toda la prueba* o *por batch/corrida*; los batches se agregan conforme se producen (el lote del día se asigna solo). Terminar exige al menos un dato, no un batch.
+- **Vistas retiradas del menú:** «Batches ejecutados»; en Catálogos: Lotes de materia prima, Equipos y maquinaria, Parámetros de operación (los datos se conservan).
+- **Panel:** indicadores sin «(hoy)» y con colores nuevos; gráficas con etiquetas de datos (situación, etapas, tipos, Cumple/No cumple por área). Título de la pestaña fijo: «Pruebas industriales».
+- Migración `20261020001700_prubind_v42_areas_fijas_y_registro_flexible.sql`.

@@ -4,7 +4,7 @@
 // =====================================================================
 import {
   sb, state, esc, icon, refreshIcons, todayISO, addDays, fmtDateTime, fmtNum, pill, makeChart, destroyCharts,
-  emptyState, errorState, navigate, monthShort, prefs, must, avatarHTML, estadoPill, ESTADOS_PRUEBA, ABIERTAS, CATEGORIAS, ACCIONES,
+  emptyState, errorState, navigate, monthShort, prefs, must, avatarHTML, estadoPill, ESTADOS_PRUEBA, ABIERTAS, CATEGORIAS, ACCIONES, AREAS, temaOscuro,
 } from '../core.js';
 import { openRegistro } from './pruebas.js';
 
@@ -95,10 +95,10 @@ function kpisHTML(k) {
   const abiertas = ABIERTAS.reduce((s, e) => s + (a[e] || 0), 0);
   const cerradas = k.cerradas_aprobadas + k.cerradas_rechazadas;
   return `<div class="grid grid-4">
-    ${kpi('i-blue', 'flask-conical', 'Pruebas abiertas', abiertas, 'Sin cerrar ni cancelar (hoy)', '#/pruebas?estado=abiertas')}
-    ${kpi('c2 i-amber', 'factory', 'En ejecución', a.en_ejecucion || 0, 'Produciendo o corriendo (hoy)', '#/pruebas?estado=en_ejecucion')}
-    ${kpi('c3 i-violet', 'gavel', 'Pendientes de dictamen', a.pendiente_dictamen || 0, 'Evaluación completa (hoy)', '#/pruebas?estado=pendiente_dictamen')}
-    ${kpi(k.urgentes_abiertas ? 'danger i-pink' : 'c4 i-pink', 'siren', 'Urgentes abiertas', k.urgentes_abiertas, cerradas ? `${k.cerradas_aprobadas} aprobada(s) y ${k.cerradas_rechazadas} rechazada(s) cerradas en el periodo` : 'Ninguna cerrada en el periodo')}
+    ${kpi('k-green i-green', 'flask-conical', 'Pruebas abiertas', abiertas, 'Sin cerrar ni cancelar', '#/pruebas?estado=abiertas')}
+    ${kpi('k-yellow i-yellow', 'factory', 'En ejecución', a.en_ejecucion || 0, 'Con registro durante el proceso', '#/pruebas?estado=en_ejecucion')}
+    ${kpi('k-orange i-orange', 'gavel', 'Pendientes de dictamen', a.pendiente_dictamen || 0, 'Resultados y recomendaciones completos', '#/pruebas?estado=pendiente_dictamen')}
+    ${kpi(k.urgentes_abiertas ? 'danger i-red' : 'k-red i-red', 'siren', 'Urgentes abiertas', k.urgentes_abiertas, cerradas ? `${k.cerradas_aprobadas} aprobada(s) y ${k.cerradas_rechazadas} rechazada(s) cerradas en el periodo` : 'Con prioridad urgente')}
   </div>`;
 }
 
@@ -114,13 +114,15 @@ function pendientesHTML(pend) {
   </section>`;
 }
 
-const chartCard = (id, title, sub, cls = '') => `<div class="card"><div class="card-head center"><div><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div></div><div class="chart-box ${cls}"><canvas id="${id}" role="img" aria-label="${esc(title)}"></canvas></div></div>`;
+const chartCard = (id, title, sub, cls = '') => `<div class="card chart-card"><div class="card-head center"><div><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div></div><div class="chart-box ${cls}"><canvas id="${id}" role="img" aria-label="${esc(title)}"></canvas></div></div>`;
 function chartsHTML(k) {
   const hayActual = Object.values(k.actual || {}).some((n) => n > 0);
   if (!k.registradas && !hayActual) return `<div class="card mt">${emptyState({ ico: 'bar-chart-3', title: 'Aún no hay pruebas', text: 'Las gráficas aparecerán al registrar pruebas.' })}</div>`;
+  const ev = (k.evaluaciones_por_area || []).some((x) => x.cumple || x.no_cumple);
   return `<div class="section-label">Indicadores</div>
-    <div class="grid grid-main">${chartCard('ch-serie', 'Pruebas registradas y cerradas', k.por_mes ? 'Por mes, en el periodo' : 'Por día, en el periodo')}${chartCard('ch-estado', 'Estado actual de todas las pruebas', '')}</div>
-    <div class="grid grid-2 mt">${chartCard('ch-tipo', 'Pruebas registradas por tipo', 'En el periodo', 'sm')}${(k.resultados_por_categoria || []).length ? chartCard('ch-res', 'Resultados por categoría', 'Capturados en el periodo', 'sm') : `<div class="card">${emptyState({ ico: 'microscope', title: 'Sin resultados en el periodo' })}</div>`}</div>`;
+    <div class="grid grid-main">${chartCard('ch-serie', 'Pruebas registradas y cerradas', k.por_mes ? 'Por mes, en el periodo' : 'Por día, en el periodo')}${chartCard('ch-estado', 'Situación de todas las pruebas', 'Todas las pruebas registradas')}</div>
+    <div class="grid grid-2 mt">${chartCard('ch-etapa', 'Pruebas en curso por etapa', 'Dónde están las pruebas abiertas', 'sm')}${chartCard('ch-tipo', 'Pruebas registradas por tipo', 'En el periodo', 'sm')}</div>
+    <div class="mt">${ev ? chartCard('ch-areas', 'Evaluación de parámetros por área', 'Cumple / No cumple, evaluados en el periodo', 'sm') : `<div class="card">${emptyState({ ico: 'list-checks', title: 'Sin parámetros evaluados en el periodo' })}</div>`}</div>`;
 }
 
 function actividadHTML(act) {
@@ -145,25 +147,39 @@ function accesoHTML() {
       <p class="access-foot">${icon('lock')} ${state.isAdmin ? 'La administración del portal no otorga autoridad de aprobación técnica.' : 'Sesión verificada con tu cuenta corporativa Pet\'s Table.'}</p></div></section>`;
 }
 
-const ESTADO_COLOR = { registrada: '#94A3B8', en_preparacion: '#38BDF8', preparada: '#0891B2', en_ejecucion: '#F58020', en_evaluacion: '#7C3AED', pendiente_resultados: '#E8890C',
-  pendiente_dictamen: '#F59E0B', aprobada: '#22C55E', rechazada: '#EF4444', requiere_repeticion: '#D97706', cerrada_aprobada: '#16A34A', cerrada_rechazada: '#DC2626', cancelada: '#64748B' };
-const TIPO_COLOR = ['#F58020', '#1BC7C7', '#7C3AED', '#2563EB', '#DB2777', '#16A34A', '#E8890C', '#0891B2', '#65A30D', '#9333EA'];
+// Tonos validados (light / dark) para cada serie; los estados usan la paleta de estado con etiqueta
+const COL = {
+  registradas: ['#F58020', '#E0701A'], cerradas: ['#1BC7C7', '#14A8A8'], unica: ['#F58020', '#E0701A'], etapa: ['#2a78d6', '#3987e5'],
+  cumple: ['#0ca30c', '#0ca30c'], no_cumple: ['#d03b3b', '#d03b3b'], curso: ['#2a78d6', '#3987e5'], gris: ['#94A3B8', '#64748B'],
+};
+const SITUACION = [['En curso', (e) => !['cerrada_aprobada', 'cerrada_rechazada', 'cancelada'].includes(e), 'curso'],
+  ['Cerradas y aprobadas', (e) => e === 'cerrada_aprobada', 'cumple'], ['Cerradas y rechazadas', (e) => e === 'cerrada_rechazada', 'no_cumple'],
+  ['Canceladas', (e) => e === 'cancelada', 'gris']];
+const ETAPA_DE = [['Registrada', ['registrada', 'en_preparacion', 'preparada']], ['Registro en proceso', ['en_ejecucion']],
+  ['Resultados y recomendaciones', ['en_evaluacion', 'pendiente_resultados']], ['Dictamen', ['pendiente_dictamen', 'requiere_repeticion']], ['Por cerrar', ['aprobada', 'rechazada']]];
 function drawCharts(k) {
+  const o = temaOscuro() ? 1 : 0;
+  const c = (n) => COL[n][o];
   const fmtP = (p) => (k.por_mes ? `${monthShort(p + '-15')} ${p.slice(2, 4)}` : `${p.slice(8, 10)}/${p.slice(5, 7)}`);
   const s = k.serie || [];
   makeChart(document.getElementById('ch-serie'), { type: 'bar', data: { labels: s.map((x) => fmtP(x.periodo)), datasets: [
-    { label: 'Registradas', data: s.map((x) => x.registradas), backgroundColor: 'rgba(245,128,32,.85)', borderRadius: 6, maxBarThickness: 28 },
-    { label: 'Cerradas', data: s.map((x) => x.cerradas), type: 'line', borderColor: '#1BC7C7', backgroundColor: '#1BC7C7', tension: .35, pointRadius: 3 }] } });
-  const pe = Object.entries(k.actual || {}).sort((a, b) => Object.keys(ESTADOS_PRUEBA).indexOf(a[0]) - Object.keys(ESTADOS_PRUEBA).indexOf(b[0]));
-  makeChart(document.getElementById('ch-estado'), { type: 'doughnut', data: { labels: pe.map(([e]) => ESTADOS_PRUEBA[e]?.label || e),
-    datasets: [{ data: pe.map(([, n]) => n), backgroundColor: pe.map(([e]) => ESTADO_COLOR[e] || '#999'), borderWidth: 0 }] }, options: { plugins: { legend: { position: 'bottom' } } } });
+    { label: 'Registradas', data: s.map((x) => x.registradas), backgroundColor: c('registradas'), maxBarThickness: 30, categoryPercentage: 0.7, barPercentage: 0.9 },
+    { label: 'Cerradas', data: s.map((x) => x.cerradas), backgroundColor: c('cerradas'), maxBarThickness: 30, categoryPercentage: 0.7, barPercentage: 0.9 }] },
+    options: { plugins: { legend: { position: 'top', align: 'end' } } } });
+  const a = k.actual || {};
+  const sit = SITUACION.map(([l, f, col]) => [l, Object.entries(a).filter(([e]) => f(e)).reduce((t, [, n]) => t + n, 0), col]).filter(([, n]) => n > 0);
+  makeChart(document.getElementById('ch-estado'), { type: 'doughnut', data: { labels: sit.map(([l]) => l),
+    datasets: [{ data: sit.map(([, n]) => n), backgroundColor: sit.map(([, , col]) => c(col)) }] },
+    options: { plugins: { legend: { position: 'bottom' }, etiquetas: { centro: 'pruebas' } } } });
+  const et = ETAPA_DE.map(([l, es]) => [l, es.reduce((t, e) => t + (a[e] || 0), 0)]);
+  makeChart(document.getElementById('ch-etapa'), { type: 'bar', data: { labels: et.map(([l]) => l), datasets: [{ label: 'Pruebas', data: et.map(([, n]) => n),
+    backgroundColor: c('etapa'), maxBarThickness: 22 }] }, options: { indexAxis: 'y', plugins: { legend: { display: false } } } });
   const pt = (k.por_tipo || []).filter((x) => x.n > 0);
   makeChart(document.getElementById('ch-tipo'), { type: 'bar', data: { labels: pt.map((x) => x.tipo), datasets: [{ label: 'Pruebas', data: pt.map((x) => x.n),
-    backgroundColor: pt.map((_, i) => TIPO_COLOR[i % TIPO_COLOR.length]), borderRadius: 6, maxBarThickness: 24 }] }, options: { indexAxis: 'y', plugins: { legend: { display: false } } } });
-  const rc = k.resultados_por_categoria || [];
-  makeChart(document.getElementById('ch-res'), { type: 'bar', data: { labels: rc.map((x) => CATEGORIAS[x.categoria] || x.categoria), datasets: [
-    { label: 'Conforme', data: rc.map((x) => x.conforme), backgroundColor: '#16A34A', borderRadius: 4 },
-    { label: 'No conforme', data: rc.map((x) => x.no_conforme), backgroundColor: '#DC2626', borderRadius: 4 },
-    { label: 'Pendiente', data: rc.map((x) => x.pendiente), backgroundColor: '#E8890C', borderRadius: 4 },
-    { label: 'No aplica', data: rc.map((x) => x.no_aplica), backgroundColor: '#94A3B8', borderRadius: 4 }] }, options: { scales: { x: { stacked: true }, y: { stacked: true } } } });
+    backgroundColor: c('unica'), maxBarThickness: 22 }] }, options: { indexAxis: 'y', plugins: { legend: { display: false } } } });
+  const ea = (k.evaluaciones_por_area || []).filter((x) => x.cumple || x.no_cumple);
+  makeChart(document.getElementById('ch-areas'), { type: 'bar', data: { labels: ea.map((x) => AREAS[x.area]?.label || x.area), datasets: [
+    { label: 'Cumple', data: ea.map((x) => x.cumple), backgroundColor: c('cumple'), maxBarThickness: 26 },
+    { label: 'No cumple', data: ea.map((x) => x.no_cumple), backgroundColor: c('no_cumple'), maxBarThickness: 26 }] },
+    options: { indexAxis: 'y', scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'top', align: 'end' } } } });
 }

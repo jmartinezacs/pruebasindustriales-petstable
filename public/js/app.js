@@ -18,7 +18,8 @@ import perfil from './modules/perfil.js';
 const ROUTES = {
   panel:     { mod: dashboard, icon: 'layout-dashboard', label: 'Panel',               roles: ['admin', 'usuario'], mobile: true },
   pruebas:   { mod: pruebas,   icon: 'flask-conical',    label: 'Pruebas',             roles: ['admin', 'usuario'], mobile: true },
-  ejecucion: { mod: programa,  icon: 'factory',          label: 'Batches ejecutados',  roles: ['admin', 'usuario'], mobile: true },
+  // Sin batches planeados (v4.2): los batches se consultan dentro de cada prueba; la vista queda fuera del menú
+  ejecucion: { mod: programa,  icon: 'factory',          label: 'Batches ejecutados',  roles: ['admin', 'usuario'], oculto: true },
   // Sin etapa de preparación (v4): el abastecimiento queda solo como consulta histórica, fuera del menú
   abastecimiento: { mod: insumos, icon: 'package',       label: 'Abastecimiento',      roles: ['admin', 'usuario'], oculto: true },
   recetas:   { mod: recetas,   icon: 'book-open',        label: 'Recetas',             roles: ['admin', 'usuario'] },
@@ -187,7 +188,7 @@ async function route() {
       a.classList.toggle('active', on);
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
-    document.title = `${r.label} · Pruebas industriales`;
+    document.title = 'Pruebas industriales';
     closeMenu();
     // Contenedor nuevo en cada vista: los listeners de la vista anterior no se acumulan
     const old = $('#view');

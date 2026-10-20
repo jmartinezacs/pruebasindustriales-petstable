@@ -43,19 +43,18 @@ function ayudaMetodo(pl, m, un) {
 }
 
 // Parámetros del plan que corresponden a la unidad y la sección
-export function itemsDe(plan, met, { unidad, seccion, fab }) {
+// Parámetros de la sección para cualquier unidad: cada parámetro se puede registrar
+// para toda la prueba (registro general) o por cada batch que se agregue.
+export function itemsDe(plan, met, { seccion }) {
   return plan.filter((pl) => {
     const m = met(pl.metodo_id);
-    if (!m || !NIVELES_UNIDAD[unidad].includes(pl.nivel)) return false;
+    if (!m) return false;
     const compl = COMPLEMENTARIAS.includes(m.categoria);
-    if (seccion === 'complementarias') return compl;
-    if (compl) return false;
-    if (seccion === 'proceso') return unidad === 'batch' || ['calidad', 'produccion'].includes(m.area);
-    return fab || ['seguridad', 'mantenimiento'].includes(m.area);   // general
+    return seccion === 'complementarias' ? compl : !compl;
   });
 }
 // ¿Los parámetros del equipo van en esta sección?
-export const conEquipo = ({ unidad, seccion, fab }) => unidad === 'corrida' && ((fab && seccion === 'general') || (!fab && seccion === 'proceso'));
+export const conEquipo = ({ unidad, seccion }) => unidad === 'corrida' && seccion !== 'complementarias';
 
 /**
  * @param {object} P prueba (v_pruebas)
@@ -72,7 +71,7 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
     sb.from('muestras_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej),
     sb.from('resultados_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej),
     unidad === 'batch' && seccion === 'proceso' ? sb.from('lotes_diarios_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej).order('fecha') : { data: [] },
-    unidad === 'batch' && seccion === 'proceso' ? sb.from('lotes_mp_prubind').select('id, lote, materia_prima_id, caducidad').eq('activo', true).order('lote').limit(1000) : { data: [] },
+    { data: [] },
     equipoAqui ? sb.from('prueba_parametros_prubind').select('*').eq('prueba_id', P.id).order('orden') : { data: [] },
     equipoAqui ? sb.from('ejecucion_controles_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej) : { data: [] },
   ]);
@@ -132,21 +131,15 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
   let cabecera = '';
   if (unidad === 'batch' && seccion === 'proceso') {
     const dis = ejecuta ? '' : 'disabled';
-    const selMp = new Set(batch ? (batch.lotes_mp || []).map((x) => x.lote_mp_id) : (previo?.lotesMp || []));
-    const loteSel = previo?.lote || loteHoy?.id || (lotes.data.length ? '' : '__hoy');
+    const nounL = fab ? 'batch' : 'corrida';
     cabecera = `
-      ${nuevo ? `<div class="form-section">${icon('package')} Batch</div>
-        <div class="field"><label for="cp-l">Lote diario <span class="req">*</span> ${ayuda('Agrupa los batches producidos el mismo día. Si es el primer batch del día, se crea solo.')}</label>
-          <select id="cp-l" name="lote" required>${loteHoy ? '' : `<option value="__hoy" ${loteSel === '__hoy' ? 'selected' : ''}>Nuevo lote de hoy: ${esc(codigoLoteHoy())}</option>`}${opciones(lotes.data, loteSel, { label: (l) => `${l.codigo} · ${fmtDate(l.fecha)}`, vacio: null })}</select></div>
-        <div class="field"><label for="cp-f">Fecha y hora</label><input id="cp-f" name="fecha_hora" type="datetime-local" required value="${aLocal(new Date())}"></div>` : ''}
-      <div class="field full"><span class="label">¿El batch se produjo sin problemas?</span>
+      ${nuevo ? `<div class="field"><label for="cp-f">Fecha y hora ${ayuda(`El número de ${nounL} se asigna solo, en orden.`)}</label><input id="cp-f" name="fecha_hora" type="datetime-local" required value="${aLocal(new Date())}"></div>` : ''}
+      <div class="field full"><span class="label">¿${fab ? 'El batch se produjo' : 'La corrida se hizo'} sin problemas?</span>
         <div class="seg" role="radiogroup">${[['conforme', 'Sí'], ['no_conforme', 'No, hubo una desviación']].map(([k, l]) => `<label class="seg-opt"><input type="radio" name="op" value="${k}" ${k === (batch?.resultado_op === 'no_conforme' ? 'no_conforme' : 'conforme') ? 'checked' : ''} ${dis}><span>${l}</span></label>`).join('')}</div></div>
       <div class="field full hidden" id="cp-inc-w"><div class="form-grid">
         <div class="field"><label for="cp-m">Tipo de desviación</label><select id="cp-m" name="motivo" ${dis}>${opciones(motDesv, batch?.motivo_desviacion_id, { vacio: 'Seleccione…' })}</select></div>
         <div class="field"><label for="cp-i">¿Qué pasó? <span class="req">*</span></label><input id="cp-i" name="inc" maxlength="1000" value="${esc(batch?.incidencias || '')}" ${dis}></div></div></div>
-      ${lotesMp.data.length && ejecuta ? `<details class="mas-datos"><summary>${icon('chevrons-up-down')} Lotes de materia prima utilizados (trazabilidad) · ${selMp.size} seleccionado(s)</summary>
-        <div class="toolbar" style="margin:0 0 6px"><div class="search">${icon('search')}<input type="search" id="cp-q" placeholder="Filtrar lotes" aria-label="Filtrar lotes"></div></div>
-        <div class="chk-list" id="cp-mps">${lotesMp.data.map((l) => `<label data-n="${esc(`${mpNom(l.materia_prima_id)} ${l.lote}`.toLowerCase())}"><input type="checkbox" value="${esc(l.id)}" ${selMp.has(l.id) ? 'checked' : ''}> ${esc(mpNom(l.materia_prima_id))} · <b>${esc(l.lote)}</b>${l.caducidad ? ` <span class="cell-sub">cad. ${fmtDate(l.caducidad)}</span>` : ''}</label>`).join('')}</div></details>` : ''}`;
+`;
   }
 
   // ---------- Parámetros del equipo (Producción) ----------
@@ -165,11 +158,11 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
   }
 
   const puedeAlgo = editables.length > 0 || (unidad === 'batch' && seccion === 'proceso' && ejecuta) || (equipoHTML && equipoEdit);
-  const titulo = unidad === 'batch' ? (batch ? `Batch #${batch.numero}` : 'Nuevo batch') : unidad === 'punto' ? `Punto: ${punto.nombre}`
-    : seccion === 'general' ? 'Registro general de la prueba' : seccion === 'complementarias' ? 'Evaluaciones complementarias' : 'Registro de la corrida';
+  const noun = fab ? 'Batch' : 'Corrida';
+  const titulo = unidad === 'batch' ? (batch ? `${noun} #${batch.numero}` : `Nuevo ${noun.toLowerCase()}`) : unidad === 'punto' ? `Punto: ${punto.nombre}` : 'Toda la prueba (registro general)';
   return openModal({
     title: `${titulo}${seccion === 'complementarias' && unidad === 'batch' ? ' · complementarias' : ''}`, subtitle: `${P.folio} · ${P.cambio}`, size: 'lg', submitText: puedeAlgo ? 'Guardar' : 'Cerrar',
-    body: `${!puedeAlgo ? aviso('Solo consulta: cada área registra sus propios parámetros.') : editables.length < items.length ? `<p class="hint">Usted registra los parámetros de su área; los demás se muestran como consulta.</p>` : ''}
+    body: `<p class="unit-hint">${icon(unidad === "batch" ? "package" : "layers")} ${unidad === "batch" ? `Valores medidos en este ${fab ? "batch" : "corrida"}. Lo que se mide una sola vez para toda la prueba se registra en «Toda la prueba».` : `Valores de toda la prueba (por ejemplo, merma total o condiciones de seguridad). Lo que se mide por ${fab ? "batch" : "corrida"} se registra en cada uno.`}</p>${!puedeAlgo ? aviso('Solo consulta: cada área registra sus propios parámetros.') : editables.length < items.length ? `<p class="hint">Usted registra los parámetros de su área; los demás se muestran como consulta.</p>` : ''}
       <div class="form-grid">${cabecera}${equipoHTML}
       ${secciones.map((k) => `<div class="form-section">${tituloSec(k)}${k === 'microbiologia' ? ` ${ayuda('Capture cada dilución leída en UFC/g. Puede dejar en blanco lo que aún no tenga lectura y completarlo después.')}` : ''}</div>
         <div class="cap-grid">${grupos[k].map(campo).join('')}</div>`).join('')}
@@ -197,10 +190,6 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
         });
       };
       form.addEventListener('input', sync); form.addEventListener('change', sync); sync();
-      form.querySelector('#cp-q')?.addEventListener('input', (e) => {
-        const q = e.target.value.toLowerCase();
-        form.querySelectorAll('#cp-mps label').forEach((l) => l.classList.toggle('hidden', !l.dataset.n.includes(q)));
-      });
     },
     onSubmit: async ({ form, setError }) => {
       if (!puedeAlgo) return;
@@ -216,21 +205,14 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
         const datos = { resultado_op: f.op?.value || 'conforme', motivo_desviacion_id: f.op?.value === 'no_conforme' ? nullIfEmpty(f.motivo.value) : null,
           incidencias: f.op?.value === 'no_conforme' ? nullIfEmpty(f.inc.value) : null };
         if (nuevo) {
-          loteId = f.lote.value;
-          if (loteId === '__hoy') loteId = must(await sb.from('lotes_diarios_prubind').insert({ prueba_id: P.id, codigo: codigoLoteHoy(), fecha: todayISO() }).select('id').single()).data.id;
+          // Lote del día: se crea solo con el primer batch del día
+          loteId = loteHoy?.id || must(await sb.from('lotes_diarios_prubind').insert({ prueba_id: P.id, codigo: codigoLoteHoy(), fecha: todayISO() }).select('id').single()).data.id;
           batchId = must(await sb.from('batches_prubind').insert({ ...datos, prueba_id: P.id, lote_diario_id: loteId, numero: 0,
             fecha_hora: new Date(f.fecha_hora.value).toISOString(), responsable_id: state.profile.id }).select('id').single()).data.id;
         } else if (['resultado_op', 'motivo_desviacion_id', 'incidencias'].some((k) => String(datos[k] ?? '') !== String(batch[k] ?? ''))) {
           mustRow(await sb.from('batches_prubind').update(datos).eq('id', batch.id).select('id'));
         }
-        const marcados = [...form.querySelectorAll('#cp-mps input:checked')].map((i) => i.value);
-        if (form.querySelector('#cp-mps')) {
-          const antes = new Set(batch ? (batch.lotes_mp || []).map((x) => x.lote_mp_id) : []);
-          const quitar = [...antes].filter((x) => !marcados.includes(x)); const agregar = marcados.filter((x) => !antes.has(x));
-          if (quitar.length) must(await sb.from('batch_lotes_mp_prubind').delete().eq('batch_id', batchId).in('lote_mp_id', quitar));
-          if (agregar.length) must(await sb.from('batch_lotes_mp_prubind').insert(agregar.map((x) => ({ batch_id: batchId, lote_mp_id: x }))));
-        }
-        previo = { lote: loteId || batch?.lote_diario_id, lotesMp: marcados };
+        previo = { lote: loteId || batch?.lote_diario_id };
       }
 
       // 2. Parámetros del equipo
