@@ -355,3 +355,5 @@ Migración `20261020002000_prubind_v52_avisos_pendientes.sql`; Edge Functions `n
 - **Campana de pendientes** en el encabezado: número de acciones que te tocan y acceso directo a cada una; si el dispositivo no tiene avisos activos, permite activarlos ahí. El número también aparece en el ícono de la app instalada cuando el sistema lo admite.
 - **Avisos:** nuevo aviso "prueba terminada" a quienes evalúan en las áreas que participaron, y recordatorio diario (lunes a sábado, 08:00) a cada persona con pendientes (pg_cron → `recordatorios_prubind`, protegido con secreto en `prubind_private.cron`).
 - **Registro de la prueba:** ficha compacta (nombre, objetivo y datos en mosaicos) y tarjeta de quien la registró con foto, puesto, fecha y hora.
+
+- **v5.2.1:** el ícono es la imagen original completa (esquinas redondeadas, sin recortes ni bordes) en iPhone, Android, computadora y avisos; la campana de pendientes pasó a ser un botón flotante junto a "Nueva prueba" e "Inicio".

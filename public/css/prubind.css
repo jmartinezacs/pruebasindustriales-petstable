@@ -810,3 +810,14 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
   .rg-datos { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 @media (max-width: 400px) { .rg-dato { padding: 8px; gap: 8px; } .rd-ico { width: 28px; height: 28px; } .rg-dato b { font-size: 13px; } }
+
+/* v5.2.1 · Campana como botón flotante */
+.fab-bell { background: linear-gradient(135deg, #0FA3A6, #1BC7C7); }
+.fab-bell:hover { box-shadow: 0 0 0 4px rgba(27, 199, 199, .25), 0 12px 30px rgba(27, 199, 199, .45); }
+.fab-bell.has svg { color: #fff; animation: campana 2.4s ease-in-out infinite; transform-origin: 50% 10%; }
+.fab-bell .bell-n { top: -4px; right: -4px; border-color: var(--bg); }
+.bell-panel { top: auto; right: 96px; bottom: 24px; max-height: calc(100vh - 48px); }
+@media (max-width: 640px) {
+  .bell-panel { top: auto; left: 8px; right: 8px; bottom: calc(76px + env(safe-area-inset-bottom)); max-height: calc(100dvh - 150px); }
+}
+.bell-acts { display: flex; gap: 6px; }

@@ -64,8 +64,8 @@ $configJs = (Read-Text('js/config.js')).Trim()
 # Sus íconos apuntan a archivos publicados en la raíz.
 $m = Get-Content (Join-Path $Src 'manifest.webmanifest') -Raw -Encoding UTF8 | ConvertFrom-Json
 $m.icons = @(
-  [ordered]@{ src = '/apple-touch-icon.png?v=3'; sizes = '512x512'; type = 'image/png'; purpose = 'any' },
-  [ordered]@{ src = '/notif-icon.png?v=3'; sizes = '192x192'; type = 'image/png'; purpose = 'any' }
+  [ordered]@{ src = '/apple-touch-icon.png?v=4'; sizes = '512x512'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/notif-icon.png?v=4'; sizes = '192x192'; type = 'image/png'; purpose = 'any' }
 )
 $manifestJson = $m | ConvertTo-Json -Depth 5
 
@@ -87,7 +87,7 @@ function Swap([string]$find, [string]$repl) {
   $script:html = $script:html.Replace($find, $repl)
 }
 Swap '  <link rel="icon" href="/favicon.ico?v=1" sizes="any">' "  <meta http-equiv=`"Content-Security-Policy`" content=`"$csp`">`n  <link rel=`"icon`" type=`"image/png`" sizes=`"64x64`" href=`"$fav64`">"
-Swap "  <link rel=`"icon`" type=`"image/png`" sizes=`"64x64`" href=`"/icons/favicon-64.png?v=3`">`n" ''
+Swap "  <link rel=`"icon`" type=`"image/png`" sizes=`"64x64`" href=`"/icons/favicon-64.png?v=4`">`n" ''
 Swap '  <link rel="manifest" href="/manifest.webmanifest?v=1">' '  <link rel="manifest" href="/manifest.webmanifest">'
 Swap '<img class="app-icon" src="/img/app-icon-128.png"' "<img class=`"app-icon`" src=`"$icon128`""
 Swap "  <link rel=`"stylesheet`" href=`"/css/app.css?v=2.0.0`">`n  <link rel=`"stylesheet`" href=`"/css/prubind.css?v=2.0.0`">" "  <style>`n$css</style>"

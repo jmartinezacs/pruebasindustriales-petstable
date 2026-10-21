@@ -1,5 +1,5 @@
 // =====================================================================
-// Campana de pendientes (encabezado): cuántas acciones te tocan y acceso
+// Campana de pendientes (botón flotante): cuántas acciones te tocan y acceso
 // directo a cada una, pensado sobre todo para el celular. Si el dispositivo
 // no tiene activadas las notificaciones, ofrece activarlas ahí mismo.
 // También pone el número en el ícono de la app instalada (si el sistema lo admite).
@@ -11,8 +11,8 @@ let PEND = [], abierta = false, cargando = false;
 
 export function montarCampana() {
   if (document.getElementById('bell-btn')) { actualizarCampana(); return; }
-  const acciones = document.querySelector('.header-actions');
-  acciones.insertAdjacentHTML('afterbegin', `<button class="bell-btn" id="bell-btn" aria-label="Tus pendientes" aria-haspopup="dialog" aria-expanded="false">${icon('bell')}<span class="bell-n hidden" id="bell-n"></span></button>`);
+  // Botón flotante, junto a "Nueva prueba" e "Inicio"
+  document.querySelector('.fabs').insertAdjacentHTML('afterbegin', `<button class="fab fab-bell" id="bell-btn" aria-label="Tus pendientes" aria-haspopup="dialog" aria-expanded="false">${icon('bell')}<span class="bell-n hidden" id="bell-n"></span><span class="fab-tip">Tus pendientes</span></button>`);
   document.body.insertAdjacentHTML('beforeend', `<div class="bell-backdrop hidden" id="bell-bd"></div>
     <section class="bell-panel hidden" id="bell-panel" role="dialog" aria-label="Tus pendientes"></section>`);
   refreshIcons();
@@ -22,6 +22,7 @@ export function montarCampana() {
   document.getElementById('bell-panel').addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]');
     if (go) { cerrar(); navigate(go.dataset.go); return; }
+    if (e.target.closest('[data-bell="cerrar"]')) { cerrar(); return; }
     const b = e.target.closest('[data-bell="notif"]');
     if (b) {
       b.disabled = true;
@@ -80,7 +81,7 @@ async function pintar() {
     ? `<div class="bell-notif">${icon('bell-ring')}<span><b>Activa las notificaciones</b>Te avisaremos cuando te toque hacer algo.</span><button class="btn primary sm" data-bell="notif">Activar</button></div>`
     : est === 'instalar' ? `<div class="bell-notif">${icon('smartphone')}<span><b>Instala la app para recibir avisos</b>En iPhone: Compartir → “Agregar a pantalla de inicio”.</span></div>` : '';
   panel.innerHTML = `<div class="bell-head"><div><b>Tus pendientes</b><span>${PEND.length ? `${PEND.length} acción(es) en ${porPrueba.size} prueba(s)` : 'Nada pendiente por ahora'}</span></div>
-      <button class="icon-btn" data-go="#/panel" aria-label="Ir al panel">${icon('layout-dashboard')}</button></div>
+      <span class="bell-acts"><button class="icon-btn" data-go="#/panel" aria-label="Ir al panel">${icon('layout-dashboard')}</button><button class="icon-btn" data-bell="cerrar" aria-label="Cerrar">${icon('x')}</button></span></div>
     ${notif}
     <div class="bell-list">${pruebas.length ? pruebas.map((p) => `<article class="bell-item prio-${esc(p.prioridad || 'normal')}">
         <div class="bi-top"><span class="pc-folio mono">${esc(p.folio)}</span>${p.prioridad !== 'normal' ? prioPill(p.prioridad) : ''}</div>
