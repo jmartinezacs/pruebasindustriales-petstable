@@ -14,6 +14,7 @@ import recetas from './modules/recetas.js';
 import usuarios from './modules/usuarios.js';
 import bitacora from './modules/bitacora.js';
 import perfil from './modules/perfil.js';
+import { montarCampana } from './modules/campana.js';
 
 const ROUTES = {
   panel:     { mod: dashboard, icon: 'layout-dashboard', label: 'Panel',               roles: ['admin', 'usuario'], mobile: true },
@@ -134,6 +135,7 @@ function startApp() {
   // Cualquier usuario activo puede registrar una prueba
   $('.fab-cita').classList.remove('hidden');
   buildNav();
+  montarCampana();
   updateThemeButton();
   if (!booted) {
     booted = true;

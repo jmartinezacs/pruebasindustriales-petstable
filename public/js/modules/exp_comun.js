@@ -28,6 +28,8 @@ export async function accion(pid, nombre, datos = {}) {
   if (nombre === 'iniciar') avisar('iniciada', pid);
   else if (nombre === 'dictaminar') avisar('dictamen', pid);
   else if (estado === 'pendiente_dictamen' && ['enviar_dictamen', 'terminar_ejecucion'].includes(nombre)) avisar('lista_dictamen', pid);
+  else if (nombre === 'terminar_ejecucion') avisar('terminada', pid);
+  document.dispatchEvent(new Event('prubind:cambio'));
   return estado;
 }
 

@@ -346,3 +346,12 @@ Migración `20261020001900_prubind_v51_admin_dictamen_objetivos.sql`.
 - **Objetivos por tipo de prueba** (más "Cumplir un requisito de cliente o regulatorio" y "Otro"); los objetivos generales anteriores quedan inactivos.
 - Sin formulación en el Registro; prioridad solo "Normal / Alta / Urgente" (Normal en azul); "Cancelada" en rojo.
 - Gráficas: encabezados y totales centrados, meses sin abreviar y etapas Registradas, En proceso, En evaluación, Pendientes de dictamen y Por cerrar.
+
+## v5.2 · Ícono nuevo, campana de pendientes y más avisos (20/10/2026)
+
+Migración `20261020002000_prubind_v52_avisos_pendientes.sql`; Edge Functions `notificar_prubind` (v2) y `recordatorios_prubind`.
+
+- **Ícono verde** (fuente: `fuentes/icono-verde.png`) en favicon, pantalla de inicio de iPhone y Android, manifiesto, inicio de sesión y avisos. Ícono de 512 px para que no se vea borroso al abrir la app instalada.
+- **Campana de pendientes** en el encabezado: número de acciones que te tocan y acceso directo a cada una; si el dispositivo no tiene avisos activos, permite activarlos ahí. El número también aparece en el ícono de la app instalada cuando el sistema lo admite.
+- **Avisos:** nuevo aviso "prueba terminada" a quienes evalúan en las áreas que participaron, y recordatorio diario (lunes a sábado, 08:00) a cada persona con pendientes (pg_cron → `recordatorios_prubind`, protegido con secreto en `prubind_private.cron`).
+- **Registro de la prueba:** ficha compacta (nombre, objetivo y datos en mosaicos) y tarjeta de quien la registró con foto, puesto, fecha y hora.

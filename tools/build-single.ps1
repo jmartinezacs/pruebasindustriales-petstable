@@ -1,7 +1,7 @@
 ﻿# Genera la versión de UN SOLO ARCHIVO para publicar:
 #   index.html            (en la raíz del repositorio: lo que publica Vercel; todo incluido)
-#   apple-touch-icon.png  (ícono de iPhone/iPad; iOS exige que sea un archivo aparte)
-#   sw.js, manifest.webmanifest, icon-512.png, notif-badge.png y notif-icon.png (notificaciones push)
+#   apple-touch-icon.png  (ícono de 512 px para iPhone y Android; nítido en la pantalla de inicio)
+#   sw.js, manifest.webmanifest, notif-badge.png y notif-icon.png (notificaciones push)
 #   version.json          (la app lo consulta y ofrece "Actualizar" si cambia APP_VERSION)
 # a partir del código fuente en public/. Calcula los hashes de la Content-Security-Policy.
 # Uso: powershell -ExecutionPolicy Bypass -File tools\build-single.ps1
@@ -17,7 +17,7 @@ function B64($rel) { [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Pat
 # Orden de dependencias: cada módulo después de los que importa
 $order = @('core', 'modules/exp_comun', 'modules/exp_captura', 'modules/exp_registro', 'modules/exp_ejec', 'modules/exp_eval', 'modules/exp_dict',
            'modules/pruebas', 'modules/dashboard', 'modules/programa', 'modules/insumos', 'modules/catalogos', 'modules/recetas',
-           'modules/usuarios', 'modules/bitacora', 'modules/perfil', 'app')
+           'modules/usuarios', 'modules/bitacora', 'modules/perfil', 'modules/campana', 'app')
 $faltan = Get-ChildItem (Join-Path $Src 'js/modules') -Filter *.js | ForEach-Object { "modules/$($_.BaseName)" } | Where-Object { $order -notcontains $_ }
 if ($faltan) { throw "Módulos sin incluir en el orden: $($faltan -join ', ')" }
 function Resolve-Key([string]$from, [string]$spec) {
@@ -64,9 +64,8 @@ $configJs = (Read-Text('js/config.js')).Trim()
 # Sus íconos apuntan a archivos publicados en la raíz.
 $m = Get-Content (Join-Path $Src 'manifest.webmanifest') -Raw -Encoding UTF8 | ConvertFrom-Json
 $m.icons = @(
-  [ordered]@{ src = '/apple-touch-icon.png'; sizes = '180x180'; type = 'image/png'; purpose = 'any' },
-  [ordered]@{ src = '/notif-icon.png'; sizes = '192x192'; type = 'image/png'; purpose = 'any' },
-  [ordered]@{ src = '/icon-512.png'; sizes = '512x512'; type = 'image/png'; purpose = 'any' }
+  [ordered]@{ src = '/apple-touch-icon.png?v=3'; sizes = '512x512'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/notif-icon.png?v=3'; sizes = '192x192'; type = 'image/png'; purpose = 'any' }
 )
 $manifestJson = $m | ConvertTo-Json -Depth 5
 
@@ -79,7 +78,7 @@ $csp = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net '$(Sha $t
        "img-src 'self' data: blob: $supa; connect-src 'self' $supa $wss; " +
        "manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
 $icon128 = 'data:image/png;base64,' + (B64 'img/app-icon-128.png')
-$fav32 = 'data:image/png;base64,' + (B64 'icons/favicon-32.png')
+$fav64 = 'data:image/png;base64,' + (B64 'icons/favicon-64.png')
 
 # ---------- 3. Ensamblar HTML ----------
 $html = Read-Text('index.html')
@@ -87,8 +86,8 @@ function Swap([string]$find, [string]$repl) {
   if (-not $script:html.Contains($find)) { throw "No se encontró en index.html: $find" }
   $script:html = $script:html.Replace($find, $repl)
 }
-Swap '  <link rel="icon" href="/favicon.ico?v=1" sizes="any">' "  <meta http-equiv=`"Content-Security-Policy`" content=`"$csp`">`n  <link rel=`"icon`" type=`"image/png`" sizes=`"32x32`" href=`"$fav32`">"
-Swap "  <link rel=`"icon`" type=`"image/png`" sizes=`"32x32`" href=`"/icons/favicon-32.png?v=1`">`n" ''
+Swap '  <link rel="icon" href="/favicon.ico?v=1" sizes="any">' "  <meta http-equiv=`"Content-Security-Policy`" content=`"$csp`">`n  <link rel=`"icon`" type=`"image/png`" sizes=`"64x64`" href=`"$fav64`">"
+Swap "  <link rel=`"icon`" type=`"image/png`" sizes=`"64x64`" href=`"/icons/favicon-64.png?v=3`">`n" ''
 Swap '  <link rel="manifest" href="/manifest.webmanifest?v=1">' '  <link rel="manifest" href="/manifest.webmanifest">'
 Swap '<img class="app-icon" src="/img/app-icon-128.png"' "<img class=`"app-icon`" src=`"$icon128`""
 Swap "  <link rel=`"stylesheet`" href=`"/css/app.css?v=2.0.0`">`n  <link rel=`"stylesheet`" href=`"/css/prubind.css?v=2.0.0`">" "  <style>`n$css</style>"
@@ -104,10 +103,9 @@ Copy-Item (Join-Path $Src 'apple-touch-icon.png') (Join-Path $Out 'apple-touch-i
 # Archivos que no pueden ir dentro del HTML: service worker (avisos push), manifiesto e íconos de los avisos
 Copy-Item (Join-Path $Src 'sw.js') (Join-Path $Out 'sw.js') -Force
 [IO.File]::WriteAllText((Join-Path $Out 'manifest.webmanifest'), $manifestJson + "`n", $utf8)
-Copy-Item (Join-Path $Src 'icons/icon-512.png') (Join-Path $Out 'icon-512.png') -Force
 # Insignia monocromática (barra de estado de Android) e ícono grande de respaldo
 Copy-Item (Join-Path $Src 'img/notif-badge.png') (Join-Path $Out 'notif-badge.png') -Force
 Copy-Item (Join-Path $Src 'img/notif-icon.png') (Join-Path $Out 'notif-icon.png') -Force
 if ($configJs -notmatch 'APP_VERSION:\s*"([^"]+)"') { throw 'No se encontró APP_VERSION en config.js' }
 [IO.File]::WriteAllText((Join-Path $Out 'version.json'), "{`"version`":`"$($Matches[1])`"}`n", $utf8)
-Get-Item (@('index.html', 'apple-touch-icon.png', 'sw.js', 'manifest.webmanifest', 'version.json', 'icon-512.png', 'notif-badge.png', 'notif-icon.png') | ForEach-Object { Join-Path $Out $_ }) | ForEach-Object { '{0,-24} {1,10:N0} bytes' -f $_.Name, $_.Length }
+Get-Item (@('index.html', 'apple-touch-icon.png', 'sw.js', 'manifest.webmanifest', 'version.json', 'notif-badge.png', 'notif-icon.png') | ForEach-Object { Join-Path $Out $_ }) | ForEach-Object { '{0,-24} {1,10:N0} bytes' -f $_.Name, $_.Length }

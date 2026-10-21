@@ -9,7 +9,7 @@ import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, nullIfEmpty, numOrNull, must, mustRow,
   DataTable, paged, sanitizeSearch, debounce, fmtDate, fmtDateTime, fmtQty, pill, estadoPill, prioPill, puedeEn, autoridad,
   getCat, invalidateCat, opciones, ESTADOS_PRUEBA, etapasDe, CERRADAS, ABIERTAS, PRIORIDADES, CAMPOS_REGISTRO, AREAS, AREAS_ORDEN, avatarHTML, emptyState, errorState,
-  refreshIcons, navigate, bindCounters, prefs, fmtBytes, dayStartTs, dayEndTs, ayuda, avisar,
+  refreshIcons, todayISO, navigate, bindCounters, prefs, fmtBytes, dayStartTs, dayEndTs, ayuda, avisar,
 } from '../core.js';
 import { box, txt, cardHead, btn, iconBtn, aviso, vacio, accion, subirEvidencia, abrirAdjunto } from './exp_comun.js';
 import { montarSelector, montarParametrosPrueba } from './exp_registro.js';
@@ -398,6 +398,7 @@ function accionesHTML() {
 
 async function refrescar(tab = tabActual, ejecucion = null) {
   if (!P || !root) return;
+  document.dispatchEvent(new Event('prubind:cambio'));
   try {
     const [np, ne] = await cargar(P.id);
     if (!root) return;
@@ -483,21 +484,39 @@ async function onClick(e) {
 // ---------- Pestaña Registro ----------
 async function tabRegistro(pane) {
   const editable = ['registrada', 'en_preparacion', 'preparada'].includes(P.estado) && puedeEn(P, 'preparar');
-  pane.innerHTML = `<div class="card">${cardHead('Registro de la prueba', 'Folio, fecha, hora y quién registra se asignan solos.', editable ? btn('data-pa="editar"', 'pencil', 'Editar registro') : '')}
-    <div class="detail-grid">
-      ${box('Folio', `<b class="mono">${esc(P.folio)}</b>`)}
-      ${box('Tipo de prueba', esc(P.tipo_nombre))}
-      ${box('Nombre de la prueba', txt(P.cambio), true)}
-      ${box('Objetivo', `${esc(P.objetivo_desc || P.objetivo_nombre || '—')}${P.objetivo_desc && P.objetivo_nombre ? `<div class="cell-sub">${esc(P.objetivo_nombre)}</div>` : ''}`, true)}
-      ${(P.campos_registro || []).map((k) => box(CAMPOS_REGISTRO[k], esc({ producto: P.receta_nombre || P.producto_nombre, receta: P.receta_nombre,
-        materia_prima: P.materia_prima_nombre, proveedor: P.proveedor_nombre, empaque: P.empaque, proceso: P.proceso, equipo: P.equipo_nombre }[k] || '—'))).join('')}
-      ${box('Fecha de ejecución', P.fecha_planeada ? fmtDate(P.fecha_planeada) : '—')}
-      ${P.batches_planeados ? box('Número de batches planeado', esc(P.batches_planeados)) : ''}
-      ${box('Prioridad', `${prioPill(P.prioridad)}${P.prioridad_just ? `<div class="cell-sub">${esc(P.prioridad_just)}</div>` : ''}`)}
-      ${box('Registró', `<div class="user-cell">${avatarHTML(P.registrado_por_nombre, P.registrado_por_foto, 'sm')}<span>${esc(P.registrado_por_nombre)}<br><span class="cell-sub">${fmtDateTime(P.created_at)}</span></span></div>`)}
-      ${P.area_nombre ? box('Área que coordina', esc(P.area_nombre)) : ''}
-      ${P.responsable_inicial_nombre ? box('Responsable de seguimiento', esc(P.responsable_inicial_nombre)) : ''}
-    </div></div>
+  // Puesto de quien registró (para la tarjeta de la persona)
+  let puesto = '';
+  try {
+    const [us, ps] = await Promise.all([getCat('usuarios'), getCat('puestos')]);
+    const u = us.find((x) => x.id === P.registrado_por);
+    puesto = ps.find((x) => x.id === u?.puesto_id)?.nombre || '';
+  } catch { /* sin puesto */ }
+  const ICO = { producto: 'cooking-pot', receta: 'cooking-pot', materia_prima: 'wheat', proveedor: 'truck', empaque: 'package', proceso: 'cog', equipo: 'wrench' };
+  const VAL = { producto: P.receta_nombre || P.producto_nombre, receta: P.receta_nombre, materia_prima: P.materia_prima_nombre,
+    proveedor: P.proveedor_nombre, empaque: P.empaque, proceso: P.proceso, equipo: P.equipo_nombre };
+  const dato = (ico, l, v) => `<div class="rg-dato"><span class="rd-ico">${icon(ico)}</span><div><small>${esc(l)}</small><b>${v}</b></div></div>`;
+  const hoy = todayISO();
+  const fecha = P.fecha_planeada ? `${fmtDate(P.fecha_planeada)}${P.fecha_planeada === hoy ? ' <em class="rd-hoy">Hoy</em>' : ''}` : '<span class="cell-sub">Sin fecha</span>';
+  pane.innerHTML = `<div class="card rg-ficha">
+      <div class="rg-main">
+        <div class="rg-top"><span class="pc-folio mono">${esc(P.folio)}</span><span class="rg-tipo">${esc(P.tipo_nombre)}</span>
+          ${editable ? `<span class="rg-edit">${btn('data-pa="editar"', 'pencil', 'Editar', 'ghost sm')}</span>` : ''}</div>
+        <h3 class="rg-nombre">${esc(P.cambio)}</h3>
+        <p class="rg-obj">${icon('target')}<span><small>Objetivo</small>${esc(P.objetivo_desc || P.objetivo_nombre || 'Sin objetivo')}${P.objetivo_desc && P.objetivo_nombre && !/^otro/i.test(P.objetivo_nombre) ? ` · <span class="cell-sub">${esc(P.objetivo_nombre)}</span>` : ''}</span></p>
+        <div class="rg-datos">
+          ${dato('calendar', 'Fecha de ejecución', fecha)}
+          ${dato('flag', 'Prioridad', `${prioPill(P.prioridad)}${P.prioridad_just ? `<span class="rd-sub">${esc(P.prioridad_just)}</span>` : ''}`)}
+          ${(P.campos_registro || []).filter((k) => VAL[k]).map((k) => dato(ICO[k] || 'circle', CAMPOS_REGISTRO[k], esc(VAL[k]))).join('')}
+        </div>
+      </div>
+      <aside class="rg-persona">
+        <small>Registró la prueba</small>
+        ${avatarHTML(P.registrado_por_nombre, P.registrado_por_foto, 'lg')}
+        <b>${esc(P.registrado_por_nombre)}</b>
+        ${puesto ? `<span class="rp-puesto">${esc(puesto)}</span>` : ''}
+        <span class="rp-fecha">${icon('clock')} ${fmtDateTime(P.created_at)}</span>
+      </aside>
+    </div>
     <div id="rg-par"></div>`;
   refreshIcons();
   const recargar = () => refrescar('registro');

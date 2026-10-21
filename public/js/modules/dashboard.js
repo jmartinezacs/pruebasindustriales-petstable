@@ -11,8 +11,8 @@ import {
 import { openRegistro, etapasMini } from './pruebas.js';
 
 let root, token = 0;
-const TAB_ACCION = { iniciar: 'proceso', definir: 'registro', capturar: 'proceso', evaluar: 'resultados', recomendar: 'recomendaciones', dictaminar: 'dictamen', cerrar: 'cierre', autorizar_implementacion: 'cierre' };
-const ACC = {
+export const TAB_ACCION = { iniciar: 'proceso', definir: 'registro', capturar: 'proceso', evaluar: 'resultados', recomendar: 'recomendaciones', dictaminar: 'dictamen', cerrar: 'cierre', autorizar_implementacion: 'cierre' };
+export const ACC = {
   iniciar: ['Iniciar la prueba', 'play', 'Iniciar'], definir: ['Definir parámetros', 'list-plus', 'Definir'], capturar: ['Registrar parámetros', 'clipboard-pen', 'Registrar'],
   evaluar: ['Evaluar resultados', 'list-checks', 'Evaluar'], recomendar: ['Dar veredicto y recomendación', 'thumbs-up', 'Veredicto'],
   dictaminar: ['Emitir dictamen', 'gavel', 'Dictamen'], cerrar: ['Cerrar la prueba', 'archive', 'Cerrar'], autorizar_implementacion: ['Autorizar implementación', 'stamp', 'Autorizar'],

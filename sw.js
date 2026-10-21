@@ -3,7 +3,7 @@
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
-const ICONO = '/notif-icon.png';
+const ICONO = '/notif-icon.png?v=3';
 
 // Ícono "tipo Facebook": foto circular de quien genera el aviso con el ícono de la
 // app en pequeño abajo a la derecha. Si algo falla (sin foto, sin red, navegador

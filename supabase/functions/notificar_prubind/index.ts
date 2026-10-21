@@ -1,6 +1,6 @@
 // Edge Function: notificar_prubind
 // Envía avisos push (Web Push) de Pruebas industriales. La invoca el sitio después
-// de registrar, iniciar, enviar a dictamen o dictaminar una prueba; la función
+// de registrar, iniciar, terminar, enviar a dictamen o dictaminar una prueba; la función
 // valida en la base de datos que el evento sea real, reciente y no duplicado.
 // Las claves VAPID se generan aquí la primera vez y viven en prubind_private.
 import webpush from 'npm:web-push@3.6.7';
@@ -17,7 +17,7 @@ const b64u = (buf: ArrayBuffer) =>
   btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const corto = (s: string, n = 90) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-const EVENTOS = ['nueva_prueba', 'iniciada', 'lista_dictamen', 'dictamen'];
+const EVENTOS = ['nueva_prueba', 'iniciada', 'terminada', 'lista_dictamen', 'dictamen'];
 const DICTAMEN: Record<string, string> = {
   aprobada: 'APROBADA', rechazada: 'RECHAZADA', requiere_repeticion: 'REQUIERE REPETICIÓN', pendiente_resultados: 'PENDIENTE DE RESULTADOS',
 };
@@ -71,6 +71,7 @@ Deno.serve(async (req) => {
     let ok = false;
     if (evento === 'nueva_prueba') ok = p.registrado_por === yo.id && reciente(p.created_at);
     if (evento === 'iniciada') ok = p.estado === 'en_ejecucion' && reciente(p.updated_at) && await puede('preparar');
+    if (evento === 'terminada') ok = ['en_evaluacion', 'pendiente_resultados'].includes(p.estado) && reciente(p.updated_at) && (await puede('preparar') || await puede('ejecutar'));
     if (evento === 'lista_dictamen') ok = p.estado === 'pendiente_dictamen' && reciente(p.updated_at);
     if (evento === 'dictamen') ok = !!DICTAMEN[p.estado] && reciente(p.updated_at) && await puede('dictaminar');
     if (!ok) return json(409, { error: 'El evento no corresponde al estado actual de la prueba.' });
@@ -95,6 +96,7 @@ Deno.serve(async (req) => {
     const txt: Record<string, [string, string]> = {
       nueva_prueba: [`${urg}Nueva prueba ${p.folio}`, `${nombre} registró ${prueba} (${tipo}). Defina los parámetros que evaluará su área.`],
       iniciada: [`${urg}Prueba ${p.folio} en proceso`, `${nombre} inició ${prueba}. Ya puede registrar los parámetros de su área.`],
+      terminada: [`Prueba ${p.folio} terminada: evalúe su área`, `${nombre} terminó ${prueba}. Evalúe los resultados de su área (Cumple / No cumple) y registre su veredicto.`],
       lista_dictamen: [`Prueba ${p.folio} lista para dictamen`, `Las áreas que participaron ya evaluaron ${prueba}. Pendiente su dictamen.`],
       dictamen: [`Dictamen de ${p.folio}: ${DICTAMEN[p.estado] || ''}`, `${nombre} emitió el dictamen de ${prueba}.`],
     };
