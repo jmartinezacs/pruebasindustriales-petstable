@@ -9,10 +9,25 @@ import { ACC, TAB_ACCION } from './dashboard.js';
 
 let PEND = [], abierta = false, cargando = false;
 
+// Campana dorada en vector (nítida en cualquier pantalla)
+const CAMPANA = `<svg class="bell-svg" viewBox="0 0 64 64" aria-hidden="true">
+  <defs>
+    <linearGradient id="bellCuerpo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE989"/><stop offset=".5" stop-color="#FFBA2E"/><stop offset="1" stop-color="#E08600"/></linearGradient>
+    <linearGradient id="bellBorde" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7AE14"/><stop offset="1" stop-color="#C47200"/></linearGradient>
+    <radialGradient id="bellBadajo" cx=".38" cy=".32" r=".75"><stop offset="0" stop-color="#FFF1BF"/><stop offset="1" stop-color="#D47E00"/></radialGradient>
+  </defs>
+  <circle cx="32" cy="9.5" r="4.2" fill="url(#bellBorde)"/>
+  <path d="M32 11.5c-10.3 0-17.2 7.6-17.2 18.3v9.1c0 2.6-1.3 4.8-3.7 6.6l-1.6 1.4v3.6h45v-3.6l-1.6-1.4c-2.4-1.8-3.7-4-3.7-6.6v-9.1c0-10.7-6.9-18.3-17.2-18.3z" fill="url(#bellCuerpo)" stroke="#C47A00" stroke-width="1.2"/>
+  <rect x="8.6" y="47.2" width="46.8" height="6.2" rx="3.1" fill="url(#bellBorde)"/>
+  <circle cx="32" cy="57" r="5" fill="url(#bellBadajo)" stroke="#C47A00" stroke-width=".8"/>
+  <path d="M21.5 21.5c2.3-3.6 5.8-5.4 9.4-5.6" stroke="#fff" stroke-opacity=".85" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <ellipse cx="21.6" cy="33" rx="2.3" ry="7.6" fill="#fff" opacity=".4"/>
+</svg>`;
+
 export function montarCampana() {
   if (document.getElementById('bell-btn')) { actualizarCampana(); return; }
   // Botón flotante, junto a "Nueva prueba" e "Inicio"
-  document.querySelector('.fabs').insertAdjacentHTML('afterbegin', `<button class="fab fab-bell" id="bell-btn" aria-label="Tus pendientes" aria-haspopup="dialog" aria-expanded="false">${icon('bell')}<span class="bell-n hidden" id="bell-n"></span><span class="fab-tip">Tus pendientes</span></button>`);
+  document.querySelector('.fabs').insertAdjacentHTML('afterbegin', `<button class="fab fab-bell" id="bell-btn" aria-label="Tus pendientes" aria-haspopup="dialog" aria-expanded="false">${CAMPANA}<span class="bell-n hidden" id="bell-n"></span><span class="fab-tip">Tus pendientes</span></button>`);
   document.body.insertAdjacentHTML('beforeend', `<div class="bell-backdrop hidden" id="bell-bd"></div>
     <section class="bell-panel hidden" id="bell-panel" role="dialog" aria-label="Tus pendientes"></section>`);
   refreshIcons();

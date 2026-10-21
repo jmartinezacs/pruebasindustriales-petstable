@@ -117,7 +117,7 @@ export default {
           ${standalone ? `<p class="hint">${icon('check-circle-2')} Ya estás usando la aplicación instalada.</p>` : `
           <button class="btn secondary hidden" id="install-btn">${icon('download')} Instalar aplicación</button>
           <p class="hint" style="margin:10px 0 6px"><b>iPhone / iPad (Safari):</b></p>
-          <ol class="steps"><li>Toca el botón <b>Compartir</b>.</li><li>Elige <b>Agregar a pantalla de inicio</b>.</li><li>Confirma el nombre “Pruebas industriales” y toca <b>Agregar</b>.</li></ol>
+          <ol class="steps"><li>Toca el botón <b>Compartir</b>.</li><li>Elige <b>Agregar a pantalla de inicio</b>.</li><li>Confirma el nombre “Pruebas” y toca <b>Agregar</b>.</li></ol>
           <p class="hint" style="margin:10px 0 6px"><b>Android (Chrome):</b></p>
           <ol class="steps"><li>Abre el menú <b>⋮</b>.</li><li>Elige <b>Instalar aplicación</b> o <b>Agregar a pantalla principal</b>.</li></ol>`}
         </div>

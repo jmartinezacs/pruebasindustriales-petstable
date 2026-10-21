@@ -821,3 +821,15 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
   .bell-panel { top: auto; left: 8px; right: 8px; bottom: calc(76px + env(safe-area-inset-bottom)); max-height: calc(100dvh - 150px); }
 }
 .bell-acts { display: flex; gap: 6px; }
+
+/* v5.2.2 · Título corto en el celular */
+.top-title .t-corto { display: none; }
+@media (max-width: 720px) { .top-title .t-largo { display: none; } .top-title .t-corto { display: inline; } }
+
+/* v5.2.2 · Campana dorada en vector (en lugar del círculo turquesa) */
+.fab-bell { background: #fff; border: 2px solid rgba(240, 170, 20, .55); box-shadow: 0 10px 26px rgba(15, 35, 50, .25); }
+.fab-bell .bell-svg { width: 36px; height: 36px; filter: drop-shadow(0 2px 2px rgba(150, 90, 0, .35)); }
+.fab-bell:hover { box-shadow: 0 0 0 4px rgba(255, 186, 46, .3), 0 12px 30px rgba(224, 134, 0, .4); }
+.fab-bell.has .bell-svg { animation: campana 2.4s ease-in-out infinite; transform-origin: 50% 12%; }
+.fab-bell.has svg:not(.bell-svg) { animation: none; }
+@media (max-width: 640px) { .fab-bell .bell-svg { width: 32px; height: 32px; } }

@@ -343,8 +343,8 @@ async function login(e) {
 }
 
 async function logout() {
-  // Deja de recibir avisos en este dispositivo (podría usarlo otra persona)
-  await push.desactivar().catch(() => {});
+  // Este dispositivo deja de recibir los avisos de esta persona (podría usarlo otra); el permiso se conserva
+  await push.desvincular().catch(() => {});
   // scope "local": cierra solo esta sesión (otras apps de Pet's Table comparten la cuenta)
   await sb.auth.signOut({ scope: 'local' });
   state.profile = null; state.session = null;

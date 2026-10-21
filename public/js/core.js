@@ -911,13 +911,13 @@ export const push = {
     if (Notification.permission === 'denied') return 'bloqueado';
     return (await push.suscripcion()) && Notification.permission === 'granted' ? 'activo' : 'inactivo';
   },
+  // Vincula la suscripción de este dispositivo a quien tiene la sesión (aunque antes fuera de otra persona)
   async guardar(sub) {
     const j = sub.toJSON();
-    const { error } = await sb.from('push_subs_prubind').insert({
-      usuario_id: state.profile.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth,
-      dispositivo: navigator.userAgent.slice(0, 200),
+    const { error } = await sb.rpc('prubind_vincular_push', {
+      p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_dispositivo: navigator.userAgent.slice(0, 200),
     });
-    if (error && error.code !== '23505') throw error;
+    if (error) throw error;
   },
   async activar() {
     if (!push.soportado()) throw new Error('Este navegador no admite notificaciones.');
@@ -942,12 +942,18 @@ export const push = {
       await sub.unsubscribe().catch(() => {});
     }
   },
-  // Al iniciar sesión: si el dispositivo ya tenía permiso, re-vincula la suscripción a este usuario
+  // Al cerrar sesión: el dispositivo deja de recibir avisos de esa persona, pero conserva
+  // el permiso y la suscripción para no volver a pedirlos al siguiente inicio de sesión
+  async desvincular() {
+    const sub = await push.suscripcion();
+    if (sub) await sb.from('push_subs_prubind').delete().eq('endpoint', sub.endpoint);
+  },
+  // Al iniciar sesión: si el dispositivo ya dio permiso, vincula (o recrea) la suscripción sin preguntar de nuevo
   async sincronizar() {
     try {
       if (!push.soportado() || Notification.permission !== 'granted') return;
       const sub = await push.suscripcion();
-      if (sub) await push.guardar(sub);
+      if (sub) await push.guardar(sub); else await push.activar();
     } catch { /* silencioso */ }
   },
 };

@@ -357,3 +357,4 @@ Migración `20261020002000_prubind_v52_avisos_pendientes.sql`; Edge Functions `n
 - **Registro de la prueba:** ficha compacta (nombre, objetivo y datos en mosaicos) y tarjeta de quien la registró con foto, puesto, fecha y hora.
 
 - **v5.2.1:** el ícono es la imagen original completa (esquinas redondeadas, sin recortes ni bordes) en iPhone, Android, computadora y avisos; la campana de pendientes pasó a ser un botón flotante junto a "Nueva prueba" e "Inicio".
+- **v5.2.2:** campana dorada en vector como botón flotante; nombre corto "Pruebas" al instalar (Android/iPhone) y en el encabezado del celular; identidad nueva de la app (`id: /pruebas`) para que la instalación en computadora tome el ícono verde; cerrar sesión ya no da de baja las notificaciones del dispositivo (migración `20261021002100_prubind_v522_vincular_push.sql`).
