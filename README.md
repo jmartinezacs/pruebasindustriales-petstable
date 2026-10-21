@@ -377,3 +377,9 @@ Migración `20261021002200_prubind_v53_pendientes_hechos.sql`.
 - Barra de la app instalada (theme_color) en turquesa #1BC7C7.
 - Catálogo "Materias primas" (antes "Materias primas y materiales").
 - Panel: texto de bienvenida que explica para qué es el sitio.
+
+## v5.5 · Pantalla completa y textos breves (21/10/2026)
+
+- App instalada: `display: fullscreen` con `display_override` [window-controls-overlay, fullscreen, standalone]. Android abre en pantalla completa; en computadora la barra de título se oculta (solo quedan los botones de ventana sobre el encabezado, que sirve para mover la ventana). iOS no permite ocultar la barra de estado.
+- Barra de color de nuevo en naranja (#F58020).
+- Textos de la app más breves (saludo, pasos siguientes, avisos y ayudas).

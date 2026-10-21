@@ -363,24 +363,24 @@ function siguientePaso() {
   const sinPar = E.sin_parametros || [];
   const porDefinir = AREAS_ORDEN.filter((a) => !(E.areas || []).includes(a) && !sinPar.includes(a) && autoridad(P.tipo, `evaluar_${a}`));
   const definir = porDefinir.length
-    ? [`Definir los parámetros de ${porDefinir.map((a) => AREAS[a].label).join(' y ')} o indicar que su área no tiene nada que evaluar (pestaña Registro).`, true] : null;
+    ? [`Definir los parámetros de ${porDefinir.map((a) => AREAS[a].label).join(' y ')} (pestaña Registro).`, true] : null;
   const registro = puedeEn(P, 'preparar')
-    ? ['Iniciar la prueba cuando esté lista. Las áreas que aún no definen sus parámetros pueden agregarlos durante la prueba.', true]
+    ? ['Iniciar la prueba cuando esté lista.', true]
     : definir || [`Esperando a que ${P.registrado_por_nombre || 'quien registró la prueba'} la inicie.`, false];
   const misAreas = AREAS_ORDEN.filter((a) => autoridad(P.tipo, `evaluar_${a}`) || autoridad(P.tipo, `capturar_${a}`));
   const proceso = definir || [misAreas.length
-    ? 'Registrar los parámetros de su área (para toda la prueba o por batch). Cuando su área termine puede evaluar y dar su veredicto, sin esperar a las demás.'
-    : 'Cada área registra sus parámetros, los evalúa y da su veredicto. Al terminar, quien registró la prueba la da por terminada.', misAreas.length > 0 || puedeEn(P, 'preparar')];
+    ? 'Registrar y evaluar los parámetros de su área.'
+    : 'Las áreas registran y evalúan sus parámetros.', misAreas.length > 0 || puedeEn(P, 'preparar')];
   const evalua = E.eval_faltantes > 0
-    ? [`Cada área evalúa sus parámetros: Cumple, No cumple o No se pudo determinar (${E.eval_faltantes} por evaluar).`, puedeEn(P, 'evaluar')]
-    : [`Cada área que participó da su veredicto y recomendación (${E.recom_faltantes} pendiente(s)); después pasa sola a dictamen.`, puedeEn(P, 'evaluar')];
+    ? [`Evaluar los parámetros de cada área (${E.eval_faltantes} pendientes).`, puedeEn(P, 'evaluar')]
+    : [`Veredicto de cada área (${E.recom_faltantes} pendientes).`, puedeEn(P, 'evaluar')];
   const msgs = {
     registrada: definir && !puedeEn(P, 'preparar') ? definir : registro, en_preparacion: registro, preparada: registro, en_ejecucion: proceso,
     en_evaluacion: evalua, pendiente_resultados: evalua,
-    pendiente_dictamen: ['Alta Dirección revisa los resultados y los veredictos de las áreas y emite el dictamen; si lo aprueba, queda autorizado implementar el cambio.', autoridad(P.tipo, 'dictaminar')],
-    requiere_repeticion: ['Iniciar una nueva ejecución vinculada a este registro.', puedeEn(P, 'preparar') || autoridad(P.tipo, 'dictaminar')],
-    aprobada: ['Cerrar la prueba (Gerencia de Procesos y Mejora Continua). El cambio ya quedó autorizado en el dictamen.', autoridad(P.tipo, 'cerrar')],
-    rechazada: ['Cerrar la prueba (Gerencia de Procesos y Mejora Continua).', autoridad(P.tipo, 'cerrar')],
+    pendiente_dictamen: ['Alta Dirección emite el dictamen.', autoridad(P.tipo, 'dictaminar')],
+    requiere_repeticion: ['Iniciar una nueva ejecución.', puedeEn(P, 'preparar') || autoridad(P.tipo, 'dictaminar')],
+    aprobada: ['Cerrar la prueba.', autoridad(P.tipo, 'cerrar')],
+    rechazada: ['Cerrar la prueba.', autoridad(P.tipo, 'cerrar')],
   }[e];
   if (!msgs) return '';
   return `<div class="next-step ${msgs[1] ? 'mine' : ''}">${icon(msgs[1] ? 'hand' : 'navigation')}<span><b>${msgs[1] ? 'Te corresponde:' : 'Siguiente paso:'}</b> ${esc(msgs[0])}</span></div>`;
@@ -454,14 +454,14 @@ async function onClick(e) {
       case 'iniciar': {
         const sinPar = E.sin_parametros || [];
         const lineas = AREAS_ORDEN.map((a) => `<li>${icon(AREAS[a].ico)} <b>${esc(AREAS[a].label)}:</b> ${(E.areas || []).includes(a) ? 'parámetros definidos'
-          : sinPar.includes(a) ? 'sin nada que evaluar' : 'aún sin parámetros (puede agregarlos durante la prueba)'}</li>`).join('');
-        if (!await confirmDialog({ title: `Iniciar ${P.folio}`, html: `<p>La prueba pasará a <b>En proceso</b> y se avisará a las áreas para que registren sus parámetros.</p><ul class="ini-areas">${lineas}</ul>`, confirmText: 'Iniciar prueba' })) return;
-        await accion(P.id, 'iniciar'); toast('Prueba iniciada: las áreas ya pueden registrar sus parámetros.', 'success'); refrescar('proceso'); return;
+          : sinPar.includes(a) ? 'sin nada que evaluar' : 'sin parámetros aún'}</li>`).join('');
+        if (!await confirmDialog({ title: `Iniciar ${P.folio}`, html: `<p>Se avisará a las áreas para que registren.</p><ul class="ini-areas">${lineas}</ul>`, confirmText: 'Iniciar prueba' })) return;
+        await accion(P.id, 'iniciar'); toast('Prueba iniciada.', 'success'); refrescar('proceso'); return;
       }
       case 'terminar': {
-        if (!await confirmDialog({ title: `Terminar ${P.folio}`, message: 'Ya no se agregarán batches. Las áreas que registraron datos completan su evaluación y su veredicto (los análisis de laboratorio pendientes se pueden completar después); las que no registraron nada no participan.', confirmText: 'Terminar prueba' })) return;
+        if (!await confirmDialog({ title: `Terminar ${P.folio}`, message: 'Ya no se agregarán batches. Las áreas completan su evaluación.', confirmText: 'Terminar prueba' })) return;
         const est = await accion(P.id, 'terminar_ejecucion');
-        toast(est === 'pendiente_dictamen' ? 'Prueba terminada: todas las áreas ya habían evaluado, pasó al dictamen.' : 'Prueba terminada: continúa la evaluación por área.', 'success');
+        toast(est === 'pendiente_dictamen' ? 'Prueba terminada; pasó a dictamen.' : 'Prueba terminada.', 'success');
         refrescar(est === 'pendiente_dictamen' ? 'dictamen' : 'resultados'); return;
       }
       case 'nueva_ejecucion':

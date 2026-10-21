@@ -11,7 +11,7 @@ import {
 async function pintarNotificaciones(box) {
   if (!box) return;
   const est = await push.estado().catch(() => 'no-soportado');
-  const quien = 'Recibirás un aviso cuando se registre o inicie una prueba en la que participa tu área, cuando una prueba quede lista para dictamen (Alta Dirección) y cuando se emita el dictamen.';
+  const quien = 'Te avisaremos cuando te toque hacer algo en una prueba.';
   const txt = {
     activo: [pill('Activadas', 'ok'), quien, `<div class="page-actions" style="justify-content:flex-start">
         <button class="btn primary" data-n="test">${icon('bell-ring')} Enviar aviso de prueba</button>
@@ -60,7 +60,7 @@ export default {
     const p = state.profile;
     const user = state.session?.user;
     const theme = prefs.get('prubind.theme') || 'system';
-    const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    const standalone = push.instalada();
     let tipos = [];
     try { tipos = await getCat('tipos'); } catch { /* se muestran los códigos */ }
     const tNom = (c) => (c ? tipos.find((t) => t.codigo === c)?.nombre || c : 'todos los tipos');

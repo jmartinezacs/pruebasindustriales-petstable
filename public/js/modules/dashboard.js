@@ -44,7 +44,7 @@ export default {
       <section class="page-intro">
         <div><span class="eyebrow">Panel general</span>
           <h1 class="hello">Hola, ${esc(state.profile.nombre.split(' ')[0])} <span class="paws" aria-hidden="true">${icon('paw-print')}${icon('paw-print')}</span></h1>
-          <p class="hello-sub">Aquí se registran y siguen las pruebas industriales de Pet's Table: nuevos productos, cambios de formulación, proveedor, empaque o proceso. Cada área define y evalúa sus parámetros, y Alta Dirección emite el dictamen.</p></div>
+          <p class="hello-sub">Registro y seguimiento de pruebas industriales.</p></div>
         <div class="toolbar" style="margin:0">
           <select id="dash-period" aria-label="Periodo"><option value="mes">Mes en curso</option><option value="90">Últimos 90 días</option>
             <option value="anio">Año en curso</option><option value="12m">Últimos 12 meses</option><option value="custom">Personalizado</option></select>
@@ -89,7 +89,7 @@ async function notifHTML() {
   const est = await push.estado().catch(() => 'no-soportado');
   if (est === 'inactivo') {
     return `<div class="notif-banner"><span class="nb-ico">${icon('bell-ring')}</span><div class="nb-txt"><b>Activa las notificaciones</b>
-      <span>Recibe un aviso en este dispositivo cuando se registre o inicie una prueba en la que participa tu área, y cuando esté lista para dictamen.</span></div>
+      <span>Te avisaremos cuando te toque hacer algo.</span></div>
       <button class="btn primary" data-dash="notif-on">${icon('bell')} Activar</button><button class="icon-btn" data-dash="notif-x" aria-label="Ocultar aviso">${icon('x')}</button></div>`;
   }
   if (est === 'instalar') {
@@ -173,7 +173,7 @@ function pintarPendientes() {
     </article>`;
   };
   const filtros = Object.keys(ACC).filter((k) => conteo[k]);
-  cont.innerHTML = `<div class="card-head center"><div><h3>${icon('hand')} Requieren tu intervención</h3><p>${porPrueba.size ? `${PEND.length} acción(es) en ${porPrueba.size} prueba(s), según tu puesto y tu participación` : 'Según tu puesto y tu participación en cada prueba'}</p></div>
+  cont.innerHTML = `<div class="card-head center"><div><h3>${icon('hand')} Requieren tu intervención</h3><p>${porPrueba.size ? `${PEND.length} acción(es) en ${porPrueba.size} prueba(s)` : 'Según tu puesto'}</p></div>
       <button class="btn primary" data-dash="nueva">${icon('flask-conical')} Nueva prueba</button></div>
     ${filtros.length > 1 ? `<div class="pend-filtros" role="tablist">${[['todas', 'Todas', PEND.length], ...filtros.map((k) => [k, ACC[k][2], conteo[k]])]
       .map(([k, l, n]) => `<button type="button" role="tab" class="pf ${filtroPend === k ? 'on' : ''}" data-dash="filtro" data-f="${k}" aria-selected="${filtroPend === k}">${k !== 'todas' ? icon(ACC[k][1]) : ''}${esc(l)} <b>${n}</b></button>`).join('')}</div>` : ''}

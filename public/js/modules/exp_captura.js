@@ -172,14 +172,14 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
   return openModal({
     title: `${titulo}${seccion === 'complementarias' && unidad === 'batch' ? ' · complementarias' : ''}`, subtitle: `${P.folio} · ${P.cambio}`, size: 'lg', submitText: puedeAlgo ? 'Guardar' : 'Cerrar',
     body: `<div class="unit-banner ${unidad === 'batch' ? 'is-batch' : 'is-general'}"><span class="ub-ico">${icon(unidad === 'batch' ? 'package' : 'layers')}</span>
-        <div><small>Registrando en</small><b>${esc(titulo)}</b><span>${unidad === 'batch' ? `Valores medidos en este ${fab ? 'batch' : 'corrida'}. Lo que se mide una sola vez va en «Toda la prueba».` : `Lo que se mide una sola vez (merma total, condiciones de seguridad…). Lo que se mide por ${fab ? 'batch' : 'corrida'} se registra en cada uno.`}</span></div></div>${!puedeAlgo ? aviso('Solo consulta: cada área registra sus propios parámetros.') : editables.length < items.length ? `<p class="hint">Usted registra los parámetros de su área; los demás se muestran como consulta.</p>` : ''}${ocultas ? `<p class="hint">${icon('eye-off')} Solo se muestran los parámetros de su área. Lo que registran las demás áreas se ve en «Participación por área».</p>` : ''}
+        <div><small>Registrando en</small><b>${esc(titulo)}</b><span>${unidad === 'batch' ? `Valores de este ${fab ? 'batch' : 'corrida'}.` : 'Lo que se mide una sola vez.'}</span></div></div>${!puedeAlgo ? aviso('Solo consulta: cada área registra sus propios parámetros.') : editables.length < items.length ? `<p class="hint">Los parámetros de otras áreas son solo de consulta.</p>` : ''}${ocultas ? `<p class="hint">${icon('eye-off')} Solo se muestran los parámetros de su área.</p>` : ''}
       <div class="form-grid">${cabecera}${equipoHTML}
       ${secciones.map((k) => `<div class="form-section">${tituloSec(k)}${k === 'microbiologia' ? ` ${ayuda('Capture cada dilución leída en UFC/g. Puede dejar en blanco lo que aún no tenga lectura y completarlo después.')}` : ''}${k === 'bromatologia' ? ` <span class="sec-note">${icon('hourglass')} Puede quedar pendiente de laboratorio</span>` : ''}</div>
         <div class="cap-grid">${grupos[k].map(campo).join('')}</div>`).join('')}
       ${!secciones.length && !equipoHTML ? '<p class="hint full">No hay parámetros para registrar en esta sección.</p>' : ''}
       ${nuevo ? '<label class="check full"><input type="checkbox" name="siguiente" checked> Al guardar, capturar el siguiente batch</label>' : ''}
       </div>
-      <p class="hint">Puede guardar con campos vacíos y completarlos cuando tenga los resultados.</p>`,
+      <p class="hint">Puede dejar campos vacíos y completarlos después.</p>`,
     onOpen: ({ form }) => {
       const sync = () => {
         const op = form.querySelector('input[name=op]:checked')?.value;

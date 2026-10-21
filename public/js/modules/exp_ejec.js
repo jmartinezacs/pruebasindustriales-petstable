@@ -93,8 +93,8 @@ export async function etapaProceso(pane, ctx) {
     pane.innerHTML = `<div class="card start-card">
       <span class="start-ico">${icon('circle-play')}</span>
       <h3>La prueba aún no inicia</h3>
-      <p>${inicia ? 'Cuando la prueba esté lista, iníciela: se avisará a las áreas para que registren sus parámetros. Las áreas que aún no los definen pueden agregarlos durante la prueba.'
-        : `${esc(P.registrado_por_nombre || 'Quien registró la prueba')} la iniciará. Mientras tanto, cada área puede definir sus parámetros en la pestaña Registro.`}</p>
+      <p>${inicia ? 'Iníciela cuando esté lista; se avisará a las áreas.'
+        : `${esc(P.registrado_por_nombre || 'Quien registró la prueba')} la iniciará.`}</p>
       ${inicia ? `<button class="btn primary lg" data-pa="iniciar">${icon('play')} Iniciar prueba</button>` : `<button class="btn secondary" data-tab="registro">${icon('list-checks')} Ver parámetros a evaluar</button>`}
     </div>`;
     refreshIcons(); return;
@@ -113,7 +113,7 @@ export async function etapaProceso(pane, ctx) {
   const Rgen = D.resDe((m) => m.nivel === 'corrida');
 
   const general = mosaico({ ico: 'layers', titulo: 'Toda la prueba', cls: 'ut-general',
-    sub: 'Registro general: lo que se mide una sola vez (merma total, condiciones de seguridad, funcionamiento del equipo…)',
+    sub: 'Lo que se mide una sola vez',
     grupos, items, R: Rgen, attrs: 'data-ej="general"', puede });
   const lotes = D.B.map((b) => mosaico({ ico: 'package', titulo: `${Noun} #${b.numero}`,
     sub: `${fmtDateTime(b.fecha_hora)} · ${pill(...OP[b.resultado_op])}${b.incidencias ? ` · ${esc(b.incidencias)}` : ''}`,
@@ -122,32 +122,32 @@ export async function etapaProceso(pane, ctx) {
 
   let estadoHTML = '';
   if (!actual) estadoHTML = aviso(`Consulta de la ejecución #${ej}.`);
-  else if (COMPLETAR.includes(P.estado)) estadoHTML = aviso('La prueba terminó. Los valores que falten (por ejemplo, resultados de laboratorio) aún se pueden completar.', '', 'info');
-  else if (enProceso && !puede) estadoHTML = aviso('Cada área registra sus parámetros: Calidad, Producción, Seguridad y Mantenimiento.');
+  else if (COMPLETAR.includes(P.estado)) estadoHTML = aviso('La prueba terminó; aún se pueden completar valores pendientes.', '', 'info');
+  else if (enProceso && !puede) estadoHTML = aviso('Cada área registra sus parámetros.');
 
   pane.innerHTML = `${estadoHTML}
     <div class="grid grid-main mt-s">
       <div>
         <div class="card">
-          <div class="card-head"><div><h3>¿Dónde va a registrar?</h3><p>Elija <b>Toda la prueba</b> para lo que se mide una sola vez, o un <b>${noun}</b> para los valores de cada ${noun} producido.</p></div>${selEjecucion(P, ej)}</div>
+          <div class="card-head"><div><h3>¿Dónde va a registrar?</h3><p>Toda la prueba o por ${noun}.</p></div>${selEjecucion(P, ej)}</div>
           ${items.length ? `<div class="unit-choice">
               ${general}
               <div class="unit-tile ut-batches">
                 <div class="ut-main as-head"><span class="ut-ico">${icon('package')}</span><span class="ut-txt"><b>Por ${noun}</b>
-                  <small>${D.B.length ? `${D.B.length} ${noun}(es) registrado(s)` : `Aún no hay ${noun}es: agregue uno cada vez que se produzca`}</small></span></div>
-                ${altaBatch ? `<button type="button" class="btn primary block" data-ej="b-nuevo">${icon('plus')} Nuevo ${noun}</button>` : `<p class="hint" style="margin:6px 2px 0">${enProceso ? `Los ${noun}es los agrega quien registra durante el proceso.` : `Ya no se agregan ${noun}es.`}</p>`}
+                  <small>${D.B.length ? `${D.B.length} ${noun}(es) registrado(s)` : `Agregue uno por cada ${noun} producido`}</small></span></div>
+                ${altaBatch ? `<button type="button" class="btn primary block" data-ej="b-nuevo">${icon('plus')} Nuevo ${noun}</button>` : `<p class="hint" style="margin:6px 2px 0">${enProceso ? `Los agrega quien registra.` : `Ya no se agregan ${noun}es.`}</p>`}
               </div>
             </div>
             ${lotes.length ? `<div class="section-title mt">${icon('package')} ${Noun}es de la prueba</div><div class="unit-grid">${lotes.join('')}</div>` : ''}`
-            : vacio('Aún no hay parámetros definidos. Cada área los define en la pestaña Registro; también se pueden agregar ahora.')}
-          ${enProceso && areas.length < 4 ? `<p class="hint mt-s">¿Falta un parámetro? <button class="link-btn" data-tab="registro">${icon('plus')} Agréguelo en Registro → Parámetros a evaluar</button></p>` : ''}
+            : vacio('Aún no hay parámetros definidos (pestaña Registro).')}
+          ${enProceso && areas.length < 4 ? `<p class="hint mt-s">¿Falta un parámetro? <button class="link-btn" data-tab="registro">${icon('plus')} Agregar en Registro</button></p>` : ''}
         </div>
       </div>
       <div class="card">
-        <div class="card-head"><div><h3>Participación por área</h3><p>Participa el área que registra algún dato</p></div></div>
+        <div class="card-head"><div><h3>Participación por área</h3><p>Quién ya registró datos</p></div></div>
         <div class="area-rows">${estadoAreas(P, E, items, D)}</div>
         ${enProceso && (puedeEn(P, 'preparar') || puedeEn(P, 'ejecutar')) ? `<button class="btn primary block mt" data-pa="terminar" ${D.R.length || D.B.length ? '' : 'disabled'}>${icon('flag')} Terminar prueba</button>
-          <p class="hint mt-s">${D.R.length || D.B.length ? 'Lo que falte de laboratorio se puede completar después.' : 'Se termina cuando haya al menos un dato registrado.'}</p>` : ''}
+          <p class="hint mt-s">${D.R.length || D.B.length ? 'Lo pendiente de laboratorio se completa después.' : 'Requiere al menos un dato registrado.'}</p>` : ''}
       </div>
     </div>`;
   refreshIcons();
@@ -201,10 +201,10 @@ export async function etapaComplementarias(pane, ctx) {
       grupos, items, R: D.resDe((m) => m.nivel === 'batch' && m.batch_id === b.id), attrs: `data-co="cap" data-id="${esc(b.id)}"`, puede })));
   // Son parámetros de Calidad: para las demás áreas el apartado aparece contraído (se puede abrir)
   pane.innerHTML = `<div class="card plegable ${misAreas(P).includes('calidad') ? '' : 'colapsada'}">
-    <div class="card-head"><div><h3>Evaluaciones complementarias</h3><p>Evaluación sensorial, microbiología y análisis bromatológicos. Forman parte de los parámetros de Calidad; se registran para toda la prueba o por batch.</p></div><span class="pleg-ico">${icon('chevron-down')}</span></div>
+    <div class="card-head"><div><h3>Evaluaciones complementarias</h3><p>Sensorial, microbiología y bromatológicos (Calidad).</p></div><span class="pleg-ico">${icon('chevron-down')}</span></div>
     <div class="compl-cats">${cats.map((c) => `<span class="chip on">${icon(ICO_CAT[c])} ${esc(NOM_CAT[c])}</span>`).join('')}</div>
-    ${cats.includes('bromatologia') ? `<div class="notice info mt-s">${icon('hourglass')}<span>Los análisis bromatológicos (proteínas, grasas, humedad, cenizas) pueden quedar <b>pendientes de laboratorio</b>: no impiden evaluar ni dar el veredicto del área, y se completan cuando lleguen.</span></div>` : ''}
-    ${!items.length ? vacio('Esta prueba no tiene evaluaciones complementarias en sus parámetros a evaluar.') : `<div class="unit-grid mt-s">${tiles.join('')}</div>`}
+    ${cats.includes('bromatologia') ? `<div class="notice info mt-s">${icon('hourglass')}<span>Los bromatológicos pueden quedar <b>pendientes de laboratorio</b> sin detener la evaluación.</span></div>` : ''}
+    ${!items.length ? vacio('Sin evaluaciones complementarias.') : `<div class="unit-grid mt-s">${tiles.join('')}</div>`}
     ${items.length && !D.B.length ? '<p class="hint mt-s">Los batches se agregan en «En proceso».</p>' : ''}
     ${enCaptura && !puede ? aviso('Las registra Calidad.') : ''}
   </div>`;

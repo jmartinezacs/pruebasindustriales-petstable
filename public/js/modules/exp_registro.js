@@ -188,7 +188,7 @@ export async function montarParametrosPrueba(el, P, recargar) {
   const crit = (pl, m) => criterioTxt(pl, unidadTxt(unidades, m.unidad_id));
   const item = ({ pl, m }, area) => `<li><span>${esc(m.nombre)} <span class="cell-sub">· ${esc(medidaTxt(m, unidades))}${crit(pl, m) ? ` · criterio ${esc(crit(pl, m))}` : ''}</span></span>
     ${editaArea(area) && !usados.has(pl.id) ? iconBtn(`data-par="quitar" data-id="${esc(pl.id)}" data-nom="${esc(m.nombre)}"`, 'x', 'Quitar parámetro', 'bad') : ''}</li>`;
-  el.innerHTML = `<div class="card mt">${cardHead('Parámetros a evaluar', 'Cada área define los parámetros que le corresponden o indica que no tiene nada que evaluar. También se pueden agregar durante la prueba.')}
+  el.innerHTML = `<div class="card mt">${cardHead('Parámetros a evaluar', 'Cada área define los suyos.')}
     <div class="areas-grid">${areas.map((area) => {
       const xs = porArea[area] || [], proc = xs.filter((x) => !esCompl(x.m)), compl = xs.filter((x) => esCompl(x.m));
       const sinDefinir = !xs.length && !(area === 'produccion' && pars.data.length);
@@ -201,7 +201,7 @@ export async function montarParametrosPrueba(el, P, recargar) {
       }
       return `<div class="area-block ${sinDefinir ? 'pendiente' : ''}"><div class="area-head">${icon(AREAS[area].ico)}<div><b>${esc(AREAS[area].label)}</b><span>${esc(AREAS[area].desc)}</span></div>
           ${sinDefinir ? `<span class="area-tag wait">${icon('hourglass')} Por definir</span>` : `<span class="area-tag ok">${xs.length + (area === 'produccion' ? pars.data.length : 0)} parámetro(s)</span>`}</div>
-        ${sinDefinir ? `<p class="hint area-nota">${editaArea(area) ? 'Defina los parámetros de su área o indique que no tiene nada que evaluar.' : `${esc(AREAS[area].label)} aún no define sus parámetros. Si no registra nada durante la prueba, se considera que no requirió participar.`}</p>` : ''}
+        ${sinDefinir ? `<p class="hint area-nota">${editaArea(area) ? 'Defina los parámetros de su área.' : `${esc(AREAS[area].label)} aún no define sus parámetros.`}</p>` : ''}
         ${proc.length ? `<ul class="param-list">${proc.map((x) => item(x, area)).join('')}</ul>` : ''}
         ${compl.length ? `<div class="sub-title">Evaluaciones complementarias</div><ul class="param-list">${compl.map((x) => item(x, area)).join('')}</ul>` : ''}
         ${area === 'produccion' && pars.data.length ? `<div class="sub-title">Parámetros del equipo (${esc(P.equipo_nombre || 'equipo')})</div><ul class="param-list">${pars.data.map((x) =>
