@@ -167,8 +167,8 @@ const esOtro = (o) => /^otro\b/i.test(o?.nombre || '');
 export async function openRegistro(p = null) {
   let c;
   try {
-    const [tipos, versiones, materias, proveedores, objetivos] = await Promise.all(['tipos', 'versiones', 'materias', 'proveedores', 'objetivos'].map((n) => getCat(n)));
-    c = { tipos, versiones, materias, proveedores, objetivos };
+    const [tipos, versiones, materias, proveedores, objetivos, usuarios] = await Promise.all(['tipos', 'versiones', 'materias', 'proveedores', 'objetivos', 'usuarios'].map((n) => getCat(n)));
+    c = { tipos, versiones, materias, proveedores, objetivos, usuarios };
   } catch (err) { toast(errMsg(err), 'error'); return false; }
   const tiposAct = c.tipos.filter((t) => t.activo || t.codigo === p?.tipo);
   const recetasDe = (vs) => vs.filter((v) => v.estado === 'vigente' || v.id === p?.receta_version_id).sort((a, b) => (a.receta?.nombre || '').localeCompare(b.receta?.nombre || ''));
@@ -207,6 +207,9 @@ export async function openRegistro(p = null) {
         <div class="field full"><span class="label">Fecha de ejecución <span class="req">*</span> ${ayuda('Un solo día o de una fecha a otra. Si no se termina antes, la prueba se termina sola al acabar el último día.')}</span>
           <div class="date-range-in"><input id="rg-fecha" name="fecha_planeada" type="date" required aria-label="Desde" value="${esc(p?.fecha_planeada || '')}">
             <span>al</span><input id="rg-fecha2" name="fecha_fin" type="date" aria-label="Hasta (opcional)" value="${esc(p?.fecha_fin || '')}"><small class="hint">Deje la segunda vacía si es un solo día.</small></div></div>
+        <div class="field full"><label for="rg-resp">Responsable de la prueba <span class="req">*</span> ${ayuda('Es quien inicia y termina la prueba.')}</label>
+          <select id="rg-resp" name="responsable_inicial_id" required>${opciones(c.usuarios.filter((u) => u.activo !== false || u.id === p?.responsable_inicial_id).sort((a, b) => a.nombre.localeCompare(b.nombre)),
+            p?.responsable_inicial_id || p?.registrado_por || state.profile.id, { vacio: 'Selecciona…' })}</select></div>
 
         ${paso(2, 'Prioridad', 'Qué tan pronto debe atenderse')}
         <div class="field full"><div class="prio-seg" role="radiogroup" aria-label="Prioridad">${Object.entries(PRIO).map(([k, [l]]) => `<label class="prio-${k}"><input type="radio" name="prioridad" value="${k}" ${k === (p?.prioridad || 'normal') ? 'checked' : ''}>
@@ -283,7 +286,7 @@ export async function openRegistro(p = null) {
         prioridad, prioridad_just: prioridad === 'normal' ? null : v.prioridad_just,
         receta_version_id: campo('receta', v.receta_version_id), materia_prima_id: campo('materia_prima', v.materia_prima_id),
         proveedor_id: campo('proveedor', v.proveedor_id), empaque: campo('empaque', v.empaque), proceso: campo('proceso', v.proceso),
-        fecha_planeada: nullIfEmpty(v.fecha_planeada), fecha_fin: nullIfEmpty(v.fecha_fin),
+        fecha_planeada: nullIfEmpty(v.fecha_planeada), fecha_fin: nullIfEmpty(v.fecha_fin), responsable_inicial_id: nullIfEmpty(v.responsable_inicial_id),
       };
       if (p) { mustRow(await sb.from('pruebas_prubind').update(payload).eq('id', p.id).select('id')); toast('Registro actualizado.', 'success'); return true; }
       const { data } = must(await sb.from('pruebas_prubind').insert({ ...payload, tipo: v.tipo, registrado_por: state.profile.id }).select('id, folio').single());
@@ -366,18 +369,19 @@ function siguientePaso() {
   const porDefinir = AREAS_ORDEN.filter((a) => !(E.areas || []).includes(a) && !sinPar.includes(a) && autoridad(P.tipo, `evaluar_${a}`));
   const definir = porDefinir.length
     ? [`Definir los parámetros de ${porDefinir.map((a) => AREAS[a].label).join(' y ')} (pestaña Registro).`, true] : null;
-  const registro = puedeEn(P, 'preparar')
-    ? ['Iniciar la prueba cuando esté lista.', true]
-    : definir || [`Esperando a que ${P.registrado_por_nombre || 'quien registró la prueba'} la inicie.`, false];
+  const resp = P.responsable_inicial_nombre || P.registrado_por_nombre || 'el responsable';
+  const registro = puedeEn(P, 'responsable')
+    ? ['Iniciar la prueba cuando esté lista (usted es el responsable).', true]
+    : definir || [`Esperando a que ${resp} (responsable) la inicie.`, false];
   const misAreas = AREAS_ORDEN.filter((a) => autoridad(P.tipo, `evaluar_${a}`) || autoridad(P.tipo, `capturar_${a}`));
   const fin = fechaFinDe(P);
-  const proceso = definir || (puedeEn(P, 'preparar') && fin && fin <= todayISO() ? ['Terminar la prueba (hoy concluye su fecha de ejecución).', true]
-    : [misAreas.length ? 'Registrar los datos de su área (botón «Registrar datos»).' : 'Las áreas registran sus parámetros.', misAreas.length > 0 || puedeEn(P, 'preparar')]);
+  const proceso = definir || (puedeEn(P, 'responsable') && fin && fin <= todayISO() ? ['Terminar la prueba (hoy concluye su fecha de ejecución).', true]
+    : [misAreas.length ? 'Registrar los datos de su área (botón «Registrar datos»).' : 'Las áreas registran sus parámetros.', misAreas.length > 0 || puedeEn(P, 'responsable')]);
   const evalua = E.eval_faltantes > 0
     ? [`Evaluar los parámetros de cada área (${E.eval_faltantes} pendientes, pestaña Evaluación).`, puedeEn(P, 'evaluar')]
     : [`Veredicto de cada área (${E.recom_faltantes} pendientes).`, puedeEn(P, 'evaluar')];
   const msgs = {
-    registrada: definir && !puedeEn(P, 'preparar') ? definir : registro, en_preparacion: registro, preparada: registro, en_ejecucion: proceso,
+    registrada: definir && !puedeEn(P, 'responsable') ? definir : registro, en_preparacion: registro, preparada: registro, en_ejecucion: proceso,
     en_evaluacion: evalua, pendiente_resultados: evalua,
     pendiente_dictamen: ['Alta Dirección emite el dictamen.', autoridad(P.tipo, 'dictaminar')],
     requiere_repeticion: ['Iniciar una nueva ejecución.', puedeEn(P, 'preparar') || autoridad(P.tipo, 'dictaminar')],
@@ -391,8 +395,10 @@ function siguientePaso() {
 function accionesHTML() {
   const e = P.estado, b = [];
   const B = (a, ico, t, cls = 'secondary') => b.push(`<button class="btn ${cls}" data-pa="${a}">${icon(ico)} ${esc(t)}</button>`);
-  if (['registrada', 'en_preparacion', 'preparada'].includes(e) && puedeEn(P, 'preparar')) { B('iniciar', 'play', 'Iniciar prueba', 'primary btn-iniciar'); B('editar', 'pencil', 'Editar registro'); }
-  if (e === 'en_ejecucion' && (puedeEn(P, 'preparar') || puedeEn(P, 'ejecutar'))) B('terminar', 'flag', 'Terminar prueba', 'primary btn-terminar');
+  const antes = ['registrada', 'en_preparacion', 'preparada'].includes(e);
+  if (antes && puedeEn(P, 'responsable')) B('iniciar', 'play', 'Iniciar prueba', 'green');
+  if (antes && puedeEn(P, 'preparar')) B('editar', 'pencil', 'Editar registro');
+  if (e === 'en_ejecucion' && puedeEn(P, 'responsable')) B('terminar', 'flag', 'Terminar prueba', 'navy');
   if (e === 'requiere_repeticion' && (puedeEn(P, 'preparar') || autoridad(P.tipo, 'dictaminar'))) B('nueva_ejecucion', 'repeat', 'Iniciar nueva ejecución', 'primary');
   b.push(`<button class="btn secondary" data-pa="imprimir">${icon('printer')} Expediente</button>`);
   if (!CERRADAS.includes(e) && puedeEn(P, 'cancelar')) B('cancelar', 'ban', 'Cancelar prueba', 'ghost danger-text');
@@ -489,11 +495,12 @@ async function onClick(e) {
 async function tabRegistro(pane) {
   const editable = ['registrada', 'en_preparacion', 'preparada'].includes(P.estado) && puedeEn(P, 'preparar');
   // Puesto de quien registró (para la tarjeta de la persona)
-  let puesto = '';
+  let puesto = '', resp = null;
   try {
     const [us, ps] = await Promise.all([getCat('usuarios'), getCat('puestos')]);
     const u = us.find((x) => x.id === P.registrado_por);
     puesto = ps.find((x) => x.id === u?.puesto_id)?.nombre || '';
+    resp = us.find((x) => x.id === (P.responsable_inicial_id || P.registrado_por));
   } catch { /* sin puesto */ }
   const ICO = { producto: 'cooking-pot', receta: 'cooking-pot', materia_prima: 'wheat', proveedor: 'truck', empaque: 'package', proceso: 'cog', equipo: 'wrench' };
   const VAL = { producto: P.receta_nombre || P.producto_nombre, receta: P.receta_nombre, materia_prima: P.materia_prima_nombre,
@@ -510,6 +517,7 @@ async function tabRegistro(pane) {
         <p class="rg-obj">${icon('target')}<span><small>Objetivo</small>${esc(P.objetivo_desc || P.objetivo_nombre || 'Sin objetivo')}${P.objetivo_desc && P.objetivo_nombre && !/^otro/i.test(P.objetivo_nombre) ? ` · <span class="cell-sub">${esc(P.objetivo_nombre)}</span>` : ''}</span></p>
         <div class="rg-datos">
           ${dato('calendar', 'Fecha de ejecución', fecha)}
+          ${dato('user-check', 'Responsable (inicia y termina)', `<span class="rd-resp">${avatarHTML(resp?.nombre || P.responsable_inicial_nombre || P.registrado_por_nombre, resp?.foto_url, 'xs')} ${esc(resp?.nombre || P.responsable_inicial_nombre || P.registrado_por_nombre)}</span>`)}
           ${dato('flag', 'Prioridad', `${prioPill(P.prioridad)}${P.prioridad_just ? `<span class="rd-sub">${esc(P.prioridad_just)}</span>` : ''}`)}
           ${(P.campos_registro || []).filter((k) => VAL[k]).map((k) => dato(ICO[k] || 'circle', CAMPOS_REGISTRO[k], esc(VAL[k]))).join('')}
         </div>
@@ -538,7 +546,7 @@ async function tabSeguimiento(pane) {
     <form class="note-form" id="seg-form" novalidate>
       <div class="field" style="margin:0"><label for="seg-txt" class="sr-only">Nueva nota</label>
         <textarea id="seg-txt" name="texto" maxlength="2000" rows="2" required placeholder="Nota, acuerdo u observación…" data-counter></textarea></div>
-      <button class="btn primary" type="submit">${icon('send')} Agregar nota</button></form>
+      <button class="btn turq" type="submit">${icon('send')} Agregar nota</button></form>
     ${data.length ? `<ol class="timeline seg-fotos">${data.map((s) => `<li class="tl-${s.tipo}">
       <span class="tl-who">${s.usuario ? avatarHTML(s.usuario, s.foto_url, 'sm') : `<span class="tl-ico">${icon('cpu')}</span>`}<span class="tl-badge">${icon(SEG_ICO[s.tipo] || 'dot')}</span></span>
       <div class="tl-body"><div class="tl-head"><b>${esc(s.usuario || 'Sistema')}</b><span>${fmtDateTime(s.created_at)}</span></div><p>${esc(s.texto)}</p></div></li>`).join('')}</ol>`

@@ -46,6 +46,8 @@ export function puedeEn(p, accion) {
   const persona = [p.registrado_por, p.responsable_inicial_id, p.responsable_ejecucion_id].includes(yo());
   const prefijo = (pre) => state.isAdmin || (state.profile?.autoridades || []).some((a) => a.accion.startsWith(pre) && (!a.tipo || a.tipo === p.tipo));
   switch (accion) {
+    // Inicia y termina la prueba: su responsable (o un administrador)
+    case 'responsable': return state.isAdmin || (p.responsable_inicial_id || p.registrado_por) === yo();
     case 'preparar': return persona || autoridad(p.tipo, 'preparar');
     case 'abastecer': return autoridad(p.tipo, 'abastecer') || puedeEn(p, 'preparar');
     case 'ejecutar': return p.responsable_ejecucion_id === yo() || autoridad(p.tipo, 'ejecutar') || prefijo('capturar_');

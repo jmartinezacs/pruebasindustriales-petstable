@@ -978,3 +978,15 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
   .rp-modo label { flex: 1; }
   .rp-modo span { width: 100%; justify-content: center; }
 }
+
+/* v5.8 · Más colores en botones de acción (el naranja queda para las acciones principales de alta) */
+.btn.turq { background: linear-gradient(135deg, #12A4A6, #1BC7C7); color: #fff; box-shadow: 0 7px 16px rgba(27, 199, 199, .25); }
+.btn.green { background: linear-gradient(135deg, #12804F, #1FAE6E); color: #fff; box-shadow: 0 7px 16px rgba(21, 138, 87, .25); }
+.btn.navy { background: linear-gradient(135deg, #12385A, #1F5E93); color: #fff; box-shadow: 0 7px 16px rgba(18, 56, 90, .28); }
+.btn.violet { background: linear-gradient(135deg, #5B3FC4, #7C5CE6); color: #fff; box-shadow: 0 7px 16px rgba(91, 63, 196, .25); }
+.btn.turq:hover, .btn.green:hover, .btn.navy:hover, .btn.violet:hover { filter: brightness(1.06); }
+.btn.turq:disabled, .btn.green:disabled, .btn.navy:disabled, .btn.violet:disabled { opacity: .5; box-shadow: none; }
+.reg-cta { background: linear-gradient(135deg, #12A4A6, #1BC7C7); box-shadow: 0 10px 24px rgba(27, 199, 199, .28); }
+.fin-card { border-color: #1F5E93; background: linear-gradient(180deg, rgba(31, 94, 147, .10), var(--card) 70%); }
+.fin-ico { background: linear-gradient(135deg, #12385A, #1F5E93); }
+.rd-resp { display: inline-flex; align-items: center; gap: 6px; }

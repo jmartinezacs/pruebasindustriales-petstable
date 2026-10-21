@@ -72,13 +72,13 @@ export async function etapaDictamen(pane, ctx) {
   pane.innerHTML = `
     ${puedeDict && pendientes.length ? `<form class="card dict-pend" id="dc-pend" novalidate>${cardHead(`Valores pendientes (${pendientes.length})`, 'Si ya los tiene, complételos y evalúelos; si no, puede dictaminar con ellos pendientes.')}
         ${listaEval(pendientes, { edit: true, completarTodo: true })}
-        <div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn primary">${icon('save')} Guardar valores</button></div></form>` : ''}
+        <div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn turq">${icon('save')} Guardar valores</button></div></form>` : ''}
     <div class="grid grid-main ${puedeDict && pendientes.length ? 'mt' : ''}">
       <div class="card">${cardHead('Resumen consolidado', 'Resultados por parámetro y recomendaciones de cada área.')}${resumenHTML(P, K, P.ejecucion_actual)}</div>
       <div class="card">${cardHead('Dictamen y aprobación', 'Alta Dirección dictamina; si aprueba, queda autorizado implementar el cambio.')}
         ${checklist(bloqueos)}
         ${E.no_cumple && P.estado === 'pendiente_dictamen' ? aviso(`${E.no_cumple} parámetro(s) no cumplen. Para aprobar, explique la decisión en la conclusión.`, 'warn', 'alert-triangle') : ''}
-        ${puedeDict ? `<button class="btn primary block" data-dc="emitir">${icon('gavel')} Emitir dictamen</button>`
+        ${puedeDict ? `<button class="btn violet block" data-dc="emitir">${icon('gavel')} Emitir dictamen</button>`
           : P.estado === 'pendiente_dictamen' ? aviso('El dictamen lo emite Alta Dirección (Directora de Calidad o Director de Producción).') : ''}
         <div class="section-title">${icon('history')} Historial de dictámenes</div>
         ${K.D.length ? `<div class="list">${K.D.slice().reverse().map((d) => `<div class="list-item">${pill(...DICT[d.dictamen])}<div class="li-main"><b>Ejecución #${d.ejecucion} · ${esc(d.por?.nombre || '')}</b>
@@ -104,7 +104,6 @@ export async function etapaDictamen(pane, ctx) {
 }
 
 async function dictamenForm(P, aprobable, noCumple) {
-  const motivos = (await getCat('motivos', { activos: true })).filter((m) => m.tipo === 'rechazo');
   return openModal({
     title: 'Dictamen y aprobación', subtitle: `${P.folio} · ${P.cambio}`, submitText: 'Emitir dictamen', size: 'lg',
     body: `<div class="field"><span class="label">Dictamen <span class="req">*</span></span>
@@ -114,22 +113,18 @@ async function dictamenForm(P, aprobable, noCumple) {
           <label><input type="radio" name="d" value="requiere_repeticion"><span>${icon('repeat')} Requiere repetición</span></label>
           <label><input type="radio" name="d" value="pendiente_resultados"><span>${icon('hourglass')} Pendiente de resultados</span></label>
         </div>${aprobable ? '' : '<small class="hint">"Aprobada" no está disponible: faltan evaluaciones o recomendaciones de las áreas.</small>'}</div>
-      <div class="field hidden" id="dc-mot-w"><label for="dc-mot">Motivo de rechazo <span class="req">*</span></label><select id="dc-mot" name="motivo">${opciones(motivos, null)}</select></div>
-      <div class="field"><label for="dc-t">Conclusión</label><textarea id="dc-t" name="texto" maxlength="1000" rows="3" placeholder="${noCumple ? 'Obligatoria para aprobar con parámetros que no cumplen y para repetir la prueba' : 'Obligatoria si se requiere repetición'}"></textarea></div>
+      <div class="field"><label for="dc-t">Conclusión</label><textarea id="dc-t" name="texto" maxlength="1000" rows="3" placeholder="${noCumple ? 'Obligatoria para aprobar con parámetros que no cumplen, para rechazar y para repetir la prueba' : 'Obligatoria para rechazar o repetir la prueba'}"></textarea></div>
       <div class="field"><label for="dc-f">Evidencia (opcional)</label><input id="dc-f" name="archivos" type="file" multiple accept="${ADJ_ACCEPT}"><small class="hint">Fotos, reportes o documentos que respaldan el dictamen.</small></div>
       ${aviso('Al aprobar, Alta Dirección autoriza implementar el cambio. Después, la Gerencia de Procesos y Mejora Continua cierra la prueba.', '', 'info')}`,
-    onOpen: ({ form }) => form.addEventListener('change', () => {
-      form.querySelector('#dc-mot-w').classList.toggle('hidden', form.querySelector('input[name=d]:checked')?.value !== 'rechazada');
-    }),
     onSubmit: async ({ form, setError }) => {
       const d = form.querySelector('input[name=d]:checked')?.value;
       if (!d) { setError('Seleccione el dictamen.'); return false; }
       const texto = form.elements.texto.value.trim();
-      if (d === 'rechazada' && !form.elements.motivo.value) { setError('Seleccione el motivo de rechazo.'); return false; }
+      if (d === 'rechazada' && !texto) { setError('Explique en la conclusión por qué se rechaza.'); return false; }
       if (d === 'requiere_repeticion' && !texto) { setError('Explique por qué se requiere repetir la prueba.'); return false; }
       if (d === 'aprobada' && noCumple && !texto) { setError('Hay parámetros que no cumplen: explique en la conclusión por qué se aprueba.'); return false; }
       const files = [...(form.elements.archivos.files || [])];
-      await accion(P.id, 'dictaminar', { dictamen: d, motivo_id: form.elements.motivo.value || null, texto });
+      await accion(P.id, 'dictaminar', { dictamen: d, texto });
       if (files.length) {
         try { await subirArchivos(P, files, { etapa: 'dictamen', descripcion: 'Evidencia del dictamen' }); }
         catch (err) { toast(`Dictamen emitido, pero la evidencia no se subió: ${errMsg(err)}`, 'warning', 8000); }
@@ -171,7 +166,7 @@ export async function etapaCierre(pane, ctx) {
       </div>
       <div class="card">${cardHead('Cierre', 'Lo realiza la Gerencia de Procesos y Mejora Continua.')}
         ${aprobada ? aviso(`<b>Implementación autorizada</b> en el dictamen de Alta Dirección${ult ? ` (${esc(ult.por?.nombre || '')} · ${fmtDateTime(ult.created_at)})` : ''}.`, '', 'badge-check') : ''}
-        ${puedeCerrar ? `<button class="btn primary block" data-ci="cerrar">${icon('archive')} Cerrar prueba</button>` : ['aprobada', 'rechazada'].includes(P.estado) ? aviso('Cierra quien tenga autoridad de cierre para este tipo de prueba.') : ''}
+        ${puedeCerrar ? `<button class="btn navy block" data-ci="cerrar">${icon('archive')} Cerrar prueba</button>` : ['aprobada', 'rechazada'].includes(P.estado) ? aviso('Cierra quien tenga autoridad de cierre para este tipo de prueba.') : ''}
         ${P.cerrada_at ? aviso(`Prueba cerrada por ${esc(P.cerrada_por_nombre || '')} el ${fmtDateTime(P.cerrada_at)}.`, '', 'archive') : ''}
       </div>
     </div>`;

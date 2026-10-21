@@ -399,3 +399,11 @@ Migración `20261021002200_prubind_v53_pendientes_hechos.sql`.
 - **Un solo formulario "Registrar datos"** en *En proceso*: cada parámetro se registra para toda la prueba (un valor) o, al elegir **Por batch**, con un renglón por batch (número y valor) y "Agregar batch". Los batches se crean solos con su número y se comparten entre parámetros; los que quedan sin datos se quitan.
 - La etapa **Resultados** se llama **Evaluación**, y la evaluación y el veredicto de las áreas solo se registran con la prueba **terminada** (servidor y pendientes).
 - Migración `20261022002500_prubind_v57_evaluar_al_terminar.sql`; pruebas `tests/sql/pruebas_flujo_v57.sql` (6/6).
+
+## v5.8 · Responsable, catálogo de parámetros simplificado y colores (22/10/2026)
+- **Responsable de la prueba:** se asigna en el registro (por omisión, quien registra) y es el único que la **inicia** y la **termina** (o un administrador).
+- **Catálogos retirados de la app:** especificaciones y criterios, plantillas de evaluación y motivos de rechazo y desviación (las tablas se conservan). Al rechazar, el dictamen pide la explicación en la conclusión.
+- **Parámetros a evaluar:** la tabla muestra código, parámetro, área, si es cuantitativo o cualitativo y unidad; el formulario (nombre, área, cómo se cuantifica y unidad) es el mismo que usan los jefes al agregar un parámetro en una prueba. Solo cuatro categorías: las áreas.
+- **Código automático** de cada parámetro: área + palabras del nombre (p. ej. `CAL-TEMP-COCC`, `SEG-EQUI-PROT`); se recalcularon todos. La humedad bromatológica se renombró "Humedad (laboratorio)".
+- Botones de acción con más colores (turquesa, verde, azul y violeta; naranja para lo principal). En *En proceso* se quitaron "Batches registrados" y "¿Falta un parámetro?".
+- Migraciones `20261022002600`–`20261022002900`; pruebas `tests/sql/pruebas_flujo_v58.sql` (10/10).

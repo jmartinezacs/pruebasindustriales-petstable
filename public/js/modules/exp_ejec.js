@@ -9,14 +9,13 @@
 // =====================================================================
 import {
   sb, esc, icon, toast, errMsg, confirmDialog, must, getCat, fmtDate, todayISO, pill, puedeEn, puedeArea, misAreas,
-  AREAS, AREAS_ORDEN, COMPLEMENTARIAS, refreshIcons, fechaEjecTxt, fechaFinDe,
+  AREAS, AREAS_ORDEN, refreshIcons, fechaEjecTxt, fechaFinDe,
 } from '../core.js';
 import { aviso, vacio } from './exp_comun.js';
-import { registroForm, esLab } from './exp_captura.js';
+import { registroForm } from './exp_captura.js';
 
 const COMPLETAR = ['en_evaluacion', 'pendiente_resultados'];
 const ANTES = ['registrada', 'en_preparacion', 'preparada'];
-const NOM_CAT = { sensorial: 'Sensorial', microbiologia: 'Microbiología', bromatologia: 'Bromatológicos' };
 
 async function cargarDatos(P, ej) {
   const [metodos, batches, plan, resultados] = await Promise.all([
@@ -74,13 +73,13 @@ export async function etapaProceso(pane, ctx) {
 
   // Antes de iniciar: no se registra nada todavía
   if (actual && ANTES.includes(P.estado)) {
-    const inicia = puedeEn(P, 'preparar');
+    const inicia = puedeEn(P, 'responsable');
     pane.innerHTML = `<div class="card start-card">
       <span class="start-ico">${icon('circle-play')}</span>
       <h3>La prueba aún no inicia</h3>
       <p>${inicia ? 'Iníciela cuando esté lista; se avisará a las áreas.'
-        : `${esc(P.registrado_por_nombre || 'Quien registró la prueba')} la iniciará.`}</p>
-      ${inicia ? `<button class="btn primary lg" data-pa="iniciar">${icon('play')} Iniciar prueba</button>` : `<button class="btn secondary" data-tab="registro">${icon('list-checks')} Ver parámetros a evaluar</button>`}
+        : `${esc(P.responsable_inicial_nombre || P.registrado_por_nombre || 'El responsable')} (responsable) la iniciará.`}</p>
+      ${inicia ? `<button class="btn green lg" data-pa="iniciar">${icon('play')} Iniciar prueba</button>` : `<button class="btn secondary" data-tab="registro">${icon('list-checks')} Ver parámetros a evaluar</button>`}
     </div>`;
     refreshIcons(); return;
   }
@@ -92,11 +91,9 @@ export async function etapaProceso(pane, ctx) {
   const areas = AREAS_ORDEN.filter((a) => items.some((pl) => D.met(pl.metodo_id)?.area === a));
   // El avance muestra las áreas de quien consulta; la participación de todas va aparte
   const vis = misAreas(P);
-  const cats = COMPLEMENTARIAS.filter((c) => items.some((pl) => D.met(pl.metodo_id)?.categoria === c));
-  const grupos = [...areas.filter((a) => vis.includes(a)).map((a) => [a, AREAS[a].label, (pl) => D.met(pl.metodo_id)?.area === a && !esLab(D.met(pl.metodo_id))]),
-    ...(vis.includes('calidad') ? cats.map((c) => [c, NOM_CAT[c], (pl) => D.met(pl.metodo_id)?.categoria === c]) : [])];
+  const grupos = areas.filter((a) => vis.includes(a)).map((a) => [a, AREAS[a].label, (pl) => D.met(pl.metodo_id)?.area === a]);
   const puede = enCaptura && puedeCapturarAlgo(P, areas);
-  const terminador = enProceso && (puedeEn(P, 'preparar') || puedeEn(P, 'ejecutar'));
+  const terminador = enProceso && puedeEn(P, 'responsable');
   const fin = fechaFinDe(P);
   const conMios = conDato(items.filter((pl) => vis.includes(D.met(pl.metodo_id)?.area)), D.R);
 
@@ -117,19 +114,15 @@ export async function etapaProceso(pane, ctx) {
                 <small>${puede ? (conMios ? `${conMios} parámetro(s) de su área con dato. Toque para continuar.` : 'Toque para capturar los valores de su área.') : 'Solo consulta.'}</small></span>
               ${icon('chevron-right')}
             </button>
-            <div class="ut-bars reg-bars">${barras(grupos, items, D.R)}</div>
-            <div class="section-title mt">${icon('package')} ${Noun}es registrados</div>
-            ${D.B.length ? `<div class="chips reg-batches">${D.B.map((b) => `<span class="chip">${icon('package')} ${Noun} ${b.numero}</span>`).join('')}</div>`
-              : `<p class="hint">Aún no hay ${noun}es. Se crean solos al elegir <b>Por ${noun}</b> en un parámetro y escribir su número.</p>`}`
+            <div class="ut-bars reg-bars">${barras(grupos, items, D.R)}</div>`
             : vacio('Aún no hay parámetros definidos (pestaña Registro).')}
-          ${enProceso && areas.length < 4 ? `<p class="hint mt-s">¿Falta un parámetro? <button class="link-btn" data-tab="registro">${icon('plus')} Agregar en Registro</button></p>` : ''}
         </div>
       </div>
       <div>
         ${terminador ? `<div class="card fin-card">
           <div class="fin-head"><span class="fin-ico">${icon('flag')}</span><div><b>¿Ya terminó la prueba?</b>
             <span>${fin ? `Fecha de ejecución: ${esc(fechaEjecTxt(P))}. ${fin < todayISO() ? 'Ya concluyó.' : `Si no la termina, se terminará sola al acabar el día ${esc(fmtDate(fin))}.`}` : 'Termínela cuando se acabe de producir.'} Al terminarla, los responsables podrán evaluar.</span></div></div>
-          <button class="btn primary block lg" data-pa="terminar" ${D.R.length || D.B.length ? '' : 'disabled'}>${icon('flag')} Terminar prueba</button>
+          <button class="btn navy block lg" data-pa="terminar" ${D.R.length || D.B.length ? '' : 'disabled'}>${icon('flag')} Terminar prueba</button>
           <p class="hint mt-s">${D.R.length || D.B.length ? 'Lo pendiente de laboratorio se completa después.' : 'Requiere al menos un dato registrado.'}</p>
           ${puedeEn(P, 'preparar') && P.fecha_planeada ? `<button class="link-btn" data-ej="fecha">${icon('calendar')} Cambiar fecha final</button>` : ''}
         </div>` : ''}

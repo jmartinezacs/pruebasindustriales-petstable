@@ -6,15 +6,14 @@
 // prueba, por eso se pueden agregar (y quedan guardados en el catálogo).
 // =====================================================================
 import {
-  sb, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, nullIfEmpty, numOrNull, must, mustRow,
-  getCat, invalidateCat, opciones, unidadTxt, fmtQty, pill, puedeEn, puedeArea, refreshIcons, ayuda,
-  AREAS, AREAS_ORDEN, COMPLEMENTARIAS, TIPOS_COMPLEMENTARIAS,
+  sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, nullIfEmpty, numOrNull, must, mustRow,
+  getCat, invalidateCat, opciones, unidadTxt, fmtQty, pill, puedeEn, puedeArea, refreshIcons, ayuda, autoridadAlguna,
+  AREAS, AREAS_ORDEN,
 } from '../core.js';
 import { cardHead, btn, iconBtn, aviso, vacio, accion, criterioTxt } from './exp_comun.js';
 
 // Los parámetros se definen o se agregan mientras la prueba no termina
 const ABIERTA = ['registrada', 'en_preparacion', 'preparada', 'en_ejecucion'];
-export const esCompl = (m) => COMPLEMENTARIAS.includes(m?.categoria);
 
 // Cómo se mide un parámetro (texto corto)
 export const medidaTxt = (m, unidades) => (m.tipo_resultado === 'numerico' || m.tipo_resultado === 'diluciones'
@@ -26,37 +25,48 @@ export async function plantillaDe(tipo) {
   return data;
 }
 
-// ---------- Agregar un parámetro ----------
-// Formulario directo: nombre, cómo se cuantifica y unidad. Si el nombre ya está en el catálogo del área
-// se usa ese; si no, se guarda como parámetro nuevo (solo lo puede hacer el responsable del área).
-export async function parametroForm({ area, tipo, excluir = [] }) {
+// ---------- Formulario de parámetro (catálogo y "Agregar parámetro" en una prueba) ----------
+// Solo lo indispensable: nombre, área, cómo se cuantifica y unidad. El código se asigna solo.
+// En una prueba (area fija): si el nombre ya está en el catálogo del área se usa ese; si no, se crea
+// (solo el responsable del área). En el catálogo (metodo = editar) se actualiza el registro.
+// Los parámetros "conteo por diluciones" cuentan como cuantitativos y "ausencia / presencia" como
+// cualitativos; si no se cambia el tipo, conservan su forma de captura.
+const CUANTI = ['numerico', 'diluciones'];
+export async function parametroForm({ area = null, tipo = null, excluir = [], metodo = null } = {}) {
   const [metodos, unidades] = await Promise.all([getCat('metodos'), getCat('unidades', { activos: true })]);
   const ya = new Set(excluir);
-  const disponibles = metodos.filter((m) => m.activo !== false && m.area === area && !ya.has(m.id))
-    .filter((m) => !esCompl(m) || TIPOS_COMPLEMENTARIAS.includes(tipo));
+  const enPrueba = !!area && !metodo;
   const norm = (s) => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const existente = (nombre) => metodos.find((m) => m.area === area && m.activo !== false && norm(m.nombre) === norm(nombre));
+  const areaDe = (form) => area || form.elements.area?.value || '';
+  const existente = (form) => enPrueba && metodos.find((m) => m.area === areaDe(form) && m.activo !== false && norm(m.nombre) === norm(form.elements.nombre.value));
+  const disponibles = enPrueba ? metodos.filter((m) => m.activo !== false && m.area === area && !ya.has(m.id)) : [];
+  const tipoIni = metodo ? (CUANTI.includes(metodo.tipo_resultado) ? 'numerico' : 'opcion') : 'numerico';
+  // Áreas que puede elegir: las que evalúa (el administrador, todas)
+  const areasOk = AREAS_ORDEN.filter((a) => state.isAdmin || autoridadAlguna(`evaluar_${a}`));
   return openModal({
-    title: `Agregar parámetro · ${AREAS[area].label}`, size: 'sm', submitText: 'Agregar',
-    body: `<div class="field"><label for="pf-n">Nombre del parámetro <span class="req">*</span></label>
-        <input id="pf-n" name="nombre" maxlength="150" required list="pf-lista" autocomplete="off" placeholder="Ej. Tiempo de enfriamiento">
-        <datalist id="pf-lista">${disponibles.map((m) => `<option value="${esc(m.nombre)}"></option>`).join('')}</datalist>
-        <small class="hint" id="pf-estado">Escriba el nombre; si ya existe en el catálogo aparecerá como sugerencia.</small></div>
+    title: metodo ? 'Editar parámetro' : `Nuevo parámetro${area ? ` · ${AREAS[area].label}` : ''}`, size: 'sm', submitText: metodo ? 'Guardar' : 'Agregar',
+    body: `${metodo ? `<p class="hint">Código: <b class="mono">${esc(metodo.codigo)}</b> (se asigna solo)</p>` : ''}
+      <div class="field"><label for="pf-n">Nombre del parámetro <span class="req">*</span></label>
+        <input id="pf-n" name="nombre" maxlength="150" required ${enPrueba ? 'list="pf-lista"' : ''} autocomplete="off" placeholder="Ej. Tiempo de enfriamiento" value="${esc(metodo?.nombre || '')}">
+        ${enPrueba ? `<datalist id="pf-lista">${disponibles.map((m) => `<option value="${esc(m.nombre)}"></option>`).join('')}</datalist>` : ''}
+        <small class="hint" id="pf-estado"></small></div>
+      ${area ? '' : `<div class="field"><label for="pf-a">Área <span class="req">*</span></label><select id="pf-a" name="area" required>
+        ${opciones(areasOk.map((a) => ({ id: a, nombre: AREAS[a].label })), metodo?.area || (areasOk.length === 1 ? areasOk[0] : ''), { vacio: 'Selecciona…' })}</select></div>`}
       <div id="pf-nuevo">
-        <div class="field"><span class="label">¿Cómo se va a cuantificar? <span class="req">*</span></span>
+        <div class="field"><span class="label">¿Cómo se cuantifica? <span class="req">*</span></span>
           <div class="seg" role="radiogroup">
-            <label class="seg-opt"><input type="radio" name="tipo" value="numerico" checked><span>Cuantitativo (valor)</span></label>
-            <label class="seg-opt"><input type="radio" name="tipo" value="opcion"><span>Cualitativo (conforme / no conforme)</span></label></div></div>
+            <label class="seg-opt"><input type="radio" name="tipo" value="numerico" ${tipoIni === 'numerico' ? 'checked' : ''}><span>Cuantitativo (valor)</span></label>
+            <label class="seg-opt"><input type="radio" name="tipo" value="opcion" ${tipoIni === 'opcion' ? 'checked' : ''}><span>Cualitativo (conforme / no conforme)</span></label></div></div>
         <div class="field" id="pf-u-w"><label for="pf-u">Unidad ${ayuda('Por ejemplo %, °C, min, kg. Déjela vacía si el valor no lleva unidad.')}</label>
-          <select id="pf-u" name="unidad">${opciones(unidades, null, { label: (u) => `${u.simbolo} · ${u.nombre}`, vacio: 'Sin unidad' })}</select></div>
+          <select id="pf-u" name="unidad">${opciones(unidades, metodo?.unidad_id || null, { label: (u) => `${u.simbolo} · ${u.nombre}`, vacio: 'Sin unidad' })}</select></div>
       </div>`,
     onOpen: ({ form }) => {
       const sync = () => {
-        const ex = existente(form.elements.nombre.value);
-        const yaEnPrueba = ex && ya.has(ex.id);
+        const ex = existente(form);
         form.querySelector('#pf-nuevo').classList.toggle('hidden', !!ex);
-        form.querySelector('#pf-estado').innerHTML = !form.elements.nombre.value.trim() ? 'Escriba el nombre; si ya existe en el catálogo aparecerá como sugerencia.'
-          : yaEnPrueba ? `${icon('info')} Ya está en esta prueba.`
+        const nom = form.elements.nombre.value.trim();
+        form.querySelector('#pf-estado').innerHTML = !enPrueba ? '' : !nom ? 'Si ya existe en el catálogo aparecerá como sugerencia.'
+          : ex && ya.has(ex.id) ? `${icon('info')} Ya está en esta prueba.`
             : ex ? `${icon('check')} Ya existe en el catálogo (${esc(medidaTxt(ex, unidades))}); se agrega a la prueba.`
               : `${icon('sparkles')} Parámetro nuevo: se guarda en el catálogo de ${esc(AREAS[area].label)}.`;
         form.querySelector('#pf-u-w').classList.toggle('hidden', form.querySelector('input[name=tipo]:checked')?.value !== 'numerico');
@@ -67,12 +77,24 @@ export async function parametroForm({ area, tipo, excluir = [] }) {
     onSubmit: async ({ form, setError }) => {
       const v = formValues(form);
       if (!checkForm(form, { nombre: (x) => (x.trim().length < 2 ? 'Escriba el nombre del parámetro.' : '') })) return false;
-      const ex = existente(v.nombre);
+      const ar = areaDe(form);
+      const tipoRes = form.querySelector('input[name=tipo]:checked')?.value || 'numerico';
+      const unidad = tipoRes === 'numerico' ? nullIfEmpty(v.unidad) : null;
+      if (metodo) {
+        // Sin cambio de tipo se conserva la forma de captura (diluciones / ausencia-presencia)
+        const mismo = (CUANTI.includes(metodo.tipo_resultado) ? 'numerico' : 'opcion') === tipoRes;
+        const payload = { nombre: v.nombre.trim(), area: ar, unidad_id: unidad };
+        if (!mismo) Object.assign(payload, { tipo_resultado: tipoRes, opciones: tipoRes === 'opcion' ? ['conforme', 'no_conforme', 'no_aplica'] : [], diluciones: [] });
+        mustRow(await sb.from('metodos_prubind').update(payload).eq('id', metodo.id).select('id'));
+        invalidateCat('metodos');
+        toast('Parámetro actualizado.', 'success');
+        return metodo.id;
+      }
+      const ex = existente(form);
       if (ex && ya.has(ex.id)) { setError('Ese parámetro ya está en esta prueba.'); return false; }
       if (ex) return ex.id;
-      const tipoRes = form.querySelector('input[name=tipo]:checked')?.value || 'numerico';
-      const { data } = must(await sb.rpc('prubind_nuevo_parametro', { p_nombre: v.nombre.trim(), p_area: area, p_tipo_resultado: tipoRes,
-        p_unidad: tipoRes === 'numerico' ? nullIfEmpty(v.unidad) : null, p_tipo_prueba: tipo }));
+      const { data } = must(await sb.rpc('prubind_nuevo_parametro', { p_nombre: v.nombre.trim(), p_area: ar, p_tipo_resultado: tipoRes,
+        p_unidad: unidad, p_tipo_prueba: tipo }));
       invalidateCat('metodos');
       toast('Parámetro guardado en el catálogo.', 'success');
       return data;
@@ -112,13 +134,11 @@ export function montarSelector(cont, { getTipo, puedeDefinir }) {
       }
       const base = plantilla.map((pt) => ({ m: met(pt.metodo_id), def: pt.obligatorio })).filter((x) => x.m && x.m.activo !== false && x.m.area === area);
       (extra[area] || []).forEach((id) => { if (!base.some((x) => x.m.id === id) && met(id)) base.push({ m: met(id), def: true }); });
-      const proceso = base.filter((x) => !esCompl(x.m)), compl = base.filter((x) => esCompl(x.m));
+      const proceso = base;
       return `<div class="area-block propia ${involucrada ? '' : 'off'}" data-area="${area}">${cabeza}${toggle}
         <div class="area-list ${involucrada ? '' : 'hidden'}">
           <p class="hint area-nota">${icon('user-check')} Usted define los parámetros de ${esc(A.label)}.</p>
-          ${proceso.length ? `${compl.length ? '<div class="sub-title">Durante el proceso</div>' : ''}<div class="chk-grid">${proceso.map((x) => fila(x.m, x.def)).join('')}</div>` : ''}
-          ${compl.length ? `<div class="sub-title">Laboratorio y sensorial ${ayuda('Bromatológicos, microbiología y evaluación sensorial. Se registran una vez para toda la prueba.')}</div>
-            <div class="chk-grid">${compl.map((x) => fila(x.m, x.def)).join('')}</div>` : ''}
+          ${proceso.length ? `<div class="chk-grid">${proceso.map((x) => fila(x.m, x.def)).join('')}</div>` : ''}
           ${!base.length ? '<p class="hint">Sin parámetros sugeridos para este tipo de prueba.</p>' : ''}
           <button type="button" class="link-btn" data-add="${area}">${icon('plus')} Agregar parámetro de ${esc(A.label)}</button>
         </div></div>`;
@@ -200,7 +220,7 @@ export async function montarParametrosPrueba(el, P, recargar) {
     ${editaArea(area) && !usados.has(pl.id) ? iconBtn(`data-par="quitar" data-id="${esc(pl.id)}" data-nom="${esc(m.nombre)}"`, 'x', 'Quitar parámetro', 'bad') : ''}</li>`;
   el.innerHTML = `<div class="card mt">${cardHead('Parámetros a evaluar', 'Cada área define los suyos.')}
     <div class="areas-grid">${areas.map((area) => {
-      const xs = porArea[area] || [], proc = xs.filter((x) => !esCompl(x.m)), compl = xs.filter((x) => esCompl(x.m));
+      const xs = porArea[area] || [], proc = xs;
       const sinDefinir = !xs.length && !(area === 'produccion' && pars.data.length);
       const dec = declarada(area);
       if (dec) {
@@ -213,7 +233,6 @@ export async function montarParametrosPrueba(el, P, recargar) {
           ${sinDefinir ? `<span class="area-tag wait">${icon('hourglass')} Por definir</span>` : `<span class="area-tag ok">${xs.length + (area === 'produccion' ? pars.data.length : 0)} parámetro(s)</span>`}</div>
         ${sinDefinir ? `<p class="hint area-nota">${editaArea(area) ? 'Defina los parámetros de su área.' : `${esc(AREAS[area].label)} aún no define sus parámetros.`}</p>` : ''}
         ${proc.length ? `<ul class="param-list">${proc.map((x) => item(x, area)).join('')}</ul>` : ''}
-        ${compl.length ? `<div class="sub-title">Laboratorio y sensorial</div><ul class="param-list">${compl.map((x) => item(x, area)).join('')}</ul>` : ''}
         ${area === 'produccion' && pars.data.length ? `<div class="sub-title">Parámetros del equipo (${esc(P.equipo_nombre || 'equipo')})</div><ul class="param-list">${pars.data.map((x) =>
           `<li><span>${esc(x.nombre)} <span class="cell-sub">· ${esc(x.minimo != null || x.maximo != null ? criterioTxt({ crit_minimo: x.minimo, crit_maximo: x.maximo }, unidadTxt(unidades, x.unidad_id)) : (x.referencia || '').split(' · ')[0] || 'referencia del equipo')}</span></span></li>`).join('')}</ul>` : ''}
         <div class="area-acts">${editaArea(area) ? `<button type="button" class="${sinDefinir ? 'btn primary sm' : 'link-btn'}" data-par="${sinDefinir ? 'definir' : 'agregar'}" data-area="${area}">${icon(sinDefinir ? 'list-checks' : 'plus')} ${sinDefinir ? 'Definir parámetros' : 'Agregar parámetro'}</button>

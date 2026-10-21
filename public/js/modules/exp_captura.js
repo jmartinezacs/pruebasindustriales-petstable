@@ -14,17 +14,14 @@
 // =====================================================================
 import {
   sb, state, esc, icon, toast, openModal, nullIfEmpty, must, mustRow, getCat, unidadTxt,
-  todayISO, puedeEn, puedeArea, misAreas, AREAS, AREAS_ORDEN, COMPLEMENTARIAS, ayuda,
+  todayISO, puedeEn, puedeArea, misAreas, AREAS, AREAS_ORDEN, ayuda,
 } from '../core.js';
 import { aviso, criterioTxt, eviPicker, eviChips, campoValor, leerValor, payloadValor, subirArchivos } from './exp_comun.js';
 
-const TITULO_CAT = { sensorial: 'Evaluación sensorial', microbiologia: 'Microbiología', bromatologia: 'Análisis bromatológicos (proximal)' };
-const ICO_CAT = { sensorial: 'eye', microbiologia: 'microscope', bromatologia: 'flask-round' };
 export const ABIERTA = ['registrada', 'en_preparacion', 'preparada', 'en_ejecucion'];
 const COMPLETAR = ['en_evaluacion', 'pendiente_resultados'];
 const pad = (n) => String(n).padStart(2, '0');
 const codigoLoteHoy = () => { const d = new Date(); return `L-${pad(d.getDate())}${pad(d.getMonth() + 1)}${String(d.getFullYear()).slice(2)}`; };
-export const esLab = (m) => COMPLEMENTARIAS.includes(m?.categoria);
 const conValor = (r) => r.valor_num != null || !!r.valor_opcion;
 
 // Estado esperado según el criterio del plan (null si no hay criterio)
@@ -99,13 +96,13 @@ export async function registroForm(P) {
   const ocultas = todos.length - items.length;
   const editables = items.filter((pl) => capArea(met(pl.metodo_id).area));
 
-  // Apartados por área; dentro de Calidad, laboratorio y sensorial por categoría
-  const clave = (m) => (esLab(m) ? m.categoria : m.area);
-  const ORDEN = ['calidad', ...COMPLEMENTARIAS, 'produccion', 'seguridad', 'mantenimiento'];
+  // Un apartado por área (Calidad, Producción, Seguridad, Mantenimiento)
+  const clave = (m) => m.area;
+  const ORDEN = AREAS_ORDEN;
   const grupos = {};
   items.forEach((pl) => { (grupos[clave(met(pl.metodo_id))] ||= []).push(pl); });
   const secciones = Object.keys(grupos).sort((a, b) => ORDEN.indexOf(a) - ORDEN.indexOf(b));
-  const tituloSec = (k) => (TITULO_CAT[k] ? `${icon(ICO_CAT[k])} ${esc(TITULO_CAT[k])} <span class="cell-sub">· Calidad</span>` : `${icon(AREAS[k].ico)} ${esc(AREAS[k].label)}`);
+  const tituloSec = (k) => `${icon(AREAS[k].ico)} ${esc(AREAS[k].label)}`;
 
   // Números de batch ya usados en la prueba (sugerencias)
   const numerosUsados = () => batches.data.map((b) => b.numero);
@@ -128,7 +125,7 @@ export async function registroForm(P) {
     const etiqueta = `${esc(m.nombre)}${u && u !== m.nombre && m.tipo_resultado !== 'diluciones' ? ` <span class="cell-sub">(${esc(u)})</span>` : ''} ${ayuda(ayudaMetodo(pl, m, u))}`;
     const puedeBatch = edit && (altaBatch || filasB.length);
     return `<div class="rp-item ${pend ? 'is-pend' : ''}" data-pl="${esc(pl.id)}" data-modo="${modo}">
-      <div class="rp-head"><div class="cap-lbl">${etiqueta}${m.codigo === 'SEN-SABOR' ? '<div class="cell-sub warn-txt">Solo conforme al protocolo autorizado y en condiciones de inocuidad.</div>' : ''}</div>
+      <div class="rp-head"><div class="cap-lbl">${etiqueta}${/^sabor$/i.test(m.nombre) ? '<div class="cell-sub warn-txt">Solo conforme al protocolo autorizado y en condiciones de inocuidad.</div>' : ''}</div>
         ${puedeBatch || filasB.length ? `<div class="rp-modo" role="radiogroup" aria-label="Cómo se registra ${esc(m.nombre)}">
           <label><input type="radio" name="md_${pl.id}" value="general" ${modo === 'general' ? 'checked' : ''} ${dis}><span>Toda la prueba</span></label>
           <label><input type="radio" name="md_${pl.id}" value="batch" ${modo === 'batch' ? 'checked' : ''} ${puedeBatch ? '' : 'disabled'}><span>Por ${noun}</span></label></div>` : ''}</div>
@@ -164,7 +161,7 @@ export async function registroForm(P) {
     body: `<div class="rp-guia">${icon('info')}<span>Escriba un valor si aplica a <b>toda la prueba</b>. Si se mide en cada ${noun}, elija <b>Por ${noun}</b> y agregue un renglón por cada uno con su número (p. ej. 29, 30, 31).</span></div>
       ${!puedeAlgo ? aviso('Solo consulta: cada área registra sus propios parámetros.') : editables.length < items.length ? '<p class="hint">Los parámetros de otras áreas son solo de consulta.</p>' : ''}${ocultas ? `<p class="hint">${icon('eye-off')} Solo se muestran los parámetros de su área.</p>` : ''}
       <datalist id="rp-nums">${numerosUsados().map((n) => `<option value="${n}"></option>`).join('')}</datalist>
-      <div class="rp-lista">${secciones.map((k) => `<div class="form-section">${tituloSec(k)}${k === 'microbiologia' ? ` ${ayuda('Capture cada dilución leída en UFC/g. Lo que aún no tenga lectura márquelo como Pendiente.')}` : ''}</div>
+      <div class="rp-lista">${secciones.map((k) => `<div class="form-section">${tituloSec(k)}</div>
         ${grupos[k].map(campo).join('')}`).join('')}
       ${equipoHTML}
       ${!secciones.length && !equipoHTML ? '<p class="hint">Aún no hay parámetros definidos (pestaña Registro).</p>' : ''}</div>

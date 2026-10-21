@@ -8,6 +8,7 @@ import {
   getCat, invalidateCat, opciones, unidadTxt, fmtDate, pill, emptyState, errorState, refreshIcons, debounce, autoridadAlguna,
   CATEGORIAS, NIVELES, CAMPOS_REGISTRO, SECCIONES_PREP, OPCIONES_TXT, AREAS,
 } from '../core.js';
+import { parametroForm } from './exp_registro.js';
 
 const TIPO_RES = { numerico: 'Numérico', opcion: 'Opciones (conforme / no conforme…)', diluciones: 'Conteo por diluciones', presencia: 'Presencia / ausencia' };
 const CAT_MP = { ingrediente: 'Ingrediente', empaque_primario: 'Empaque primario', empaque_secundario: 'Empaque secundario', otro: 'Otro' };
@@ -42,19 +43,13 @@ const DEFS = {
       { n: 'referencia', l: 'Referencia de la especificación aprobada', t: 'text', max: 200, full: true, hint: 'Obligatoria si se captura un rango. No capture límites sin documento que los respalde.' }],
     cols: [['Parámetro', (r, x) => `<div class="cell-main">${esc(r.nombre)}</div><div class="cell-sub">${esc(x.equipos.find((e) => e.id === r.equipo_id)?.nombre || '')}</div>`],
       ['Rango', (r, x) => (r.minimo != null || r.maximo != null ? `${r.minimo ?? '—'} – ${r.maximo ?? '—'} ${esc(unidadTxt(x.unidades, r.unidad_id))}<div class="cell-sub">${esc(r.referencia || '')}</div>` : '<span class="cell-sub">Sin rango</span>')]] },
-  metodos: { label: 'Parámetros a evaluar', icon: 'microscope', table: 'metodos_prubind', cat: 'metodos', order: 'codigo', filtro: { n: 'area', l: 'Área', opts: () => Object.entries(AREAS).map(([id, a]) => ({ id, nombre: a.label })) },
-    fields: [{ n: 'codigo', l: 'Código', t: 'text', req: true, max: 30, upper: true, pattern: '[A-Za-z0-9_-]{2,30}' }, { n: 'nombre', l: 'Nombre', t: 'text', req: true, max: 150 },
-      { n: 'area', l: 'Área que lo registra y evalúa', t: 'select', req: true, opts: () => Object.entries(AREAS).map(([id, a]) => ({ id, nombre: a.label })) },
-      { n: 'categoria', l: 'Categoría', t: 'select', req: true, opts: () => kv(CATEGORIAS) }, { n: 'tipo_resultado', l: 'Tipo de resultado', t: 'select', req: true, opts: () => kv(TIPO_RES) },
-      { n: 'unidad_id', l: 'Unidad', t: 'select', opts: async () => (await getCat('unidades')).map((u) => ({ ...u, nombre: u.simbolo })) },
-      { n: 'diluciones', l: 'Diluciones (separadas por coma)', t: 'array', hint: 'Ej. 10⁻¹, 10⁻². Solo para "Conteo por diluciones".' },
-      { n: 'horas_lectura', l: 'Lectura a las (horas)', t: 'number', int: true }, { n: 'tecnica', l: 'Técnica', t: 'text', max: 120 },
-      { n: 'base_expresion', l: 'Base de expresión', t: 'text', max: 60 }, { n: 'procedimiento_ref', l: 'Procedimiento de referencia', t: 'text', max: 200 },
-      { n: 'opciones', l: 'Opciones de resultado', t: 'checks', opts: () => OPC_POSIBLES.map((o) => ({ id: o, nombre: OPCIONES_TXT[o] })), full: true },
-      { n: 'revisa_puesto_id', l: 'Requiere revisión del puesto', t: 'select', opts: () => getCat('puestos') }],
-    cols: [['Parámetro', (r) => `<div class="cell-main">${esc(r.nombre)}</div><div class="cell-sub mono">${esc(r.codigo)}</div>`], ['Área / categoría', (r) => `${esc(AREAS[r.area]?.label || '')}<div class="cell-sub">${esc(CATEGORIAS[r.categoria])}</div>`],
-      ['Resultado', (r, x) => `${esc(TIPO_RES[r.tipo_resultado])}<div class="cell-sub">${esc([unidadTxt(x.unidades, r.unidad_id), (r.diluciones || []).join(', '), r.horas_lectura && `${r.horas_lectura} h`, r.tecnica].filter(Boolean).join(' · '))}</div>`]] },
-  especificaciones: { label: 'Especificaciones y criterios', icon: 'ruler', table: 'especificaciones_prubind', order: 'updated_at', filtro: { n: 'metodo_id', l: 'Método', opts: () => getCat('metodos') },
+  metodos: { label: 'Parámetros a evaluar', icon: 'microscope', table: 'metodos_prubind', cat: 'metodos', order: 'codigo', filtro: { n: 'area', l: 'Área', opts: () => Object.entries(AREAS).map(([id, a]) => ({ id, nombre: a.label })) }, formulario: true,
+    fields: [],
+    cols: [['Código', (r) => `<b class="mono">${esc(r.codigo)}</b>`], ['Parámetro', (r) => esc(r.nombre)], ['Área', (r) => esc(AREAS[r.area]?.label || '')],
+      ['Se cuantifica', (r) => (['numerico', 'diluciones'].includes(r.tipo_resultado) ? 'Cuantitativo' : 'Cualitativo')],
+      ['Unidad', (r, x) => esc(unidadTxt(x.unidades, r.unidad_id) || '—')]] },
+  // Retirados de la app (v5.8): no se usan en el flujo actual; las tablas y su historial se conservan
+  especificaciones: { oculto: true, label: 'Especificaciones y criterios', icon: 'ruler', table: 'especificaciones_prubind', order: 'updated_at', filtro: { n: 'metodo_id', l: 'Método', opts: () => getCat('metodos') },
     fields: [{ n: 'metodo_id', l: 'Método o control', t: 'select', req: true, opts: () => getCat('metodos'), full: true },
       { n: 'producto_id', l: 'Receta (vacío = general)', t: 'select', opts: () => getCat('productos') }, { n: 'materia_prima_id', l: 'Materia prima (vacío = general)', t: 'select', opts: () => getCat('materias') },
       { n: 'minimo', l: 'Mínimo', t: 'number' }, { n: 'maximo', l: 'Máximo', t: 'number' },
@@ -64,7 +59,7 @@ const DEFS = {
     cols: [['Método', (r, x) => `<div class="cell-main">${esc(x.metodos.find((m) => m.id === r.metodo_id)?.nombre || '')}</div><div class="cell-sub">${esc([x.productos.find((p) => p.id === r.producto_id)?.nombre, x.materias.find((m) => m.id === r.materia_prima_id)?.nombre].filter(Boolean).join(' · ') || 'General')}</div>`],
       ['Criterio', (r) => esc(r.minimo != null || r.maximo != null ? `${r.minimo ?? '—'} – ${r.maximo ?? '—'}` : r.criterio_texto || '')],
       ['Referencia', (r) => `<span class="cell-sub">${esc(r.referencia)} · v${esc(r.version)}</span> ${r.vigente ? pill('Vigente', 'ok') : pill('No vigente', 'gray')}`]] },
-  plantillas: { label: 'Plantillas de evaluación', icon: 'layout-template', table: 'plantilla_evaluacion_prubind', order: 'orden', filtro: { n: 'tipo', l: 'Tipo de prueba', opts: async () => (await getCat('tipos')).map((t) => ({ id: t.codigo, nombre: t.nombre })), req: true },
+  plantillas: { oculto: true, label: 'Plantillas de evaluación', icon: 'layout-template', table: 'plantilla_evaluacion_prubind', order: 'orden', filtro: { n: 'tipo', l: 'Tipo de prueba', opts: async () => (await getCat('tipos')).map((t) => ({ id: t.codigo, nombre: t.nombre })), req: true },
     fields: [{ n: 'tipo', l: 'Tipo de prueba', t: 'select', req: true, opts: async () => (await getCat('tipos')).map((t) => ({ id: t.codigo, nombre: t.nombre })) },
       { n: 'metodo_id', l: 'Método o control', t: 'select', req: true, opts: () => getCat('metodos') },
       { n: 'nivel', l: 'Nivel de muestreo sugerido', t: 'select', req: true, opts: () => kv(NIVELES) }, { n: 'orden', l: 'Orden', t: 'number', int: true }, { n: 'obligatorio', l: 'Sugerido (aparece marcado al registrar)', t: 'bool' }],
@@ -84,7 +79,7 @@ const DEFS = {
     fields: [{ n: 'nombre', l: 'Objetivo', t: 'text', req: true, max: 120 }, { n: 'tipo', l: 'Solo para el tipo (vacío = todos)', t: 'select', opts: async () => (await getCat('tipos')).map((t) => ({ id: t.codigo, nombre: t.nombre })) },
       { n: 'orden', l: 'Orden', t: 'number', int: true }],
     cols: [['Objetivo', (r) => esc(r.nombre)], ['Tipo', (r, x) => esc(x.tipos.find((t) => t.codigo === r.tipo)?.nombre || 'Todos')]] },
-  motivos: { label: 'Motivos de rechazo y desviación', icon: 'octagon-alert', table: 'motivos_prubind', cat: 'motivos', order: 'nombre', filtro: { n: 'tipo', l: 'Tipo', opts: () => kv({ rechazo: 'Rechazo', desviacion: 'Desviación' }) },
+  motivos: { oculto: true, label: 'Motivos de rechazo y desviación', icon: 'octagon-alert', table: 'motivos_prubind', cat: 'motivos', order: 'nombre', filtro: { n: 'tipo', l: 'Tipo', opts: () => kv({ rechazo: 'Rechazo', desviacion: 'Desviación' }) },
     fields: [{ n: 'tipo', l: 'Tipo', t: 'select', req: true, opts: () => kv({ rechazo: 'Rechazo', desviacion: 'Desviación' }) }, { n: 'nombre', l: 'Motivo', t: 'text', req: true, max: 120 }],
     cols: [['Motivo', (r) => esc(r.nombre)], ['Tipo', (r) => (r.tipo === 'rechazo' ? pill('Rechazo', 'bad') : pill('Desviación', 'warn'))]] },
   evidencias: { label: 'Tipos de evidencia', icon: 'file-check', table: 'tipos_evidencia_prubind', cat: 'evidencias', order: 'nombre',
@@ -178,7 +173,8 @@ async function onClick(e) {
   const d = DEFS[actual], pk = d.pk || 'id';
   const r = filas.find((x) => String(x[pk]) === b.dataset.id);
   try {
-    if (b.dataset.cat === 'nuevo') { if (await formulario(d, null)) refrescar(); }
+    if (d.formulario && ['nuevo', 'editar'].includes(b.dataset.cat)) { if (await parametroForm({ metodo: b.dataset.cat === 'editar' ? r : null })) refrescar(); }
+    else if (b.dataset.cat === 'nuevo') { if (await formulario(d, null)) refrescar(); }
     else if (b.dataset.cat === 'editar') { if (await formulario(d, r)) refrescar(); }
     else if (b.dataset.cat === 'toggle') {
       mustRow(await sb.from(d.table).update({ activo: r.activo === false }).eq(pk, r[pk]).select(pk));

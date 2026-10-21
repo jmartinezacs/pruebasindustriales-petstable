@@ -1,4 +1,6 @@
 -- =====================================================================
+-- NOTA (v5.8): los códigos de parámetro ahora son automáticos (p. ej. FQ-PH → CAL-PH, BRO-HUM → CAL-HUME-LABO);
+-- este archivo usa los códigos anteriores. Ver pruebas_flujo_v58.sql.
 -- v5.0 · Inicio explícito, áreas independientes, "sin parámetros",
 -- "No se pudo determinar" y bromatológicos pendientes. Todo se REVIERTE.
 -- =====================================================================

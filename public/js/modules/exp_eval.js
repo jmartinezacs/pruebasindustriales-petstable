@@ -158,7 +158,7 @@ export async function etapaResultados(pane, ctx) {
     <div class="ev-legend">${Object.values(EVALUACION).map(([l, cls, ic]) => `<span class="ev-n ${cls}">${icon(ic)} ${esc(l)}</span>`).join('')}<span class="ev-n warn">${icon('hourglass')} Pendiente: complételo o márquelo con ?</span></div>
     ${K.areas.length ? '' : `<div class="card">${vacio('La prueba no tiene parámetros a evaluar.')}</div>`}
     ${[...K.areas].sort((x, y) => Number(!vis.includes(x)) - Number(!vis.includes(y))).map((a) => {
-      const fs = K.filas.filter((f) => f.area === a); const proc = fs.filter((f) => !f.compl), compl = fs.filter((f) => f.compl);
+      const fs = K.filas.filter((f) => f.area === a);
       const conDato = fs.filter((f) => f.conValor).length; const evaluados = fs.filter((f) => f.ev).length; const falta = K.faltan(a);
       const pend = fs.filter((f) => f.pend && !f.ev).length;
       const sinDatos = !K.participa(a);
@@ -167,9 +167,8 @@ export async function etapaResultados(pane, ctx) {
         <div class="card-head"><div class="ae-title"><span class="ar-ico">${icon(AREAS[a].ico)}</span><div><h3>${esc(AREAS[a].label)}</h3>
           <p>${sinDatos && !pend ? 'Aún sin datos registrados' : `${evaluados} evaluado(s) · ${conDato} con resultado${falta ? ` · <b>${falta} por evaluar</b>` : ''}${pend ? ` · <b class="warn-txt">${pend} pendiente(s)</b>` : ''}`}</p></div></div>
           <div class="head-btns">${resumenEval(fs)}${edit && fs.some((f) => f.conValor && !f.ev) ? `<button type="button" class="btn ghost sm" data-re="todo-cumple">${icon('check-check')} Marcar el resto como Cumple</button>` : ''}<span class="pleg-ico">${icon('chevron-down')}</span></div></div>
-        ${proc.length ? listaEval(proc, { edit, completarTodo }) : ''}
-        ${compl.length ? `<div class="section-title">${icon('microscope')} Laboratorio y sensorial</div>${listaEval(compl, { edit, completarTodo })}` : ''}
-        ${edit ? `<div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn primary">${icon('save')} Guardar evaluación de ${esc(AREAS[a].label)}</button></div>`
+        ${fs.length ? listaEval(fs, { edit, completarTodo }) : ''}
+        ${edit ? `<div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn turq">${icon('save')} Guardar evaluación de ${esc(AREAS[a].label)}</button></div>`
           : enEval && falta ? aviso(`Lo evalúa el responsable de ${esc(AREAS[a].label)}.`) : ''}
       </form>`;
     }).join('')}`;
@@ -226,7 +225,7 @@ export async function etapaRecomendaciones(pane, ctx) {
           return `<label class="verdict ${cls}"><input type="radio" name="sentido" value="${k}" ${r?.sentido === k ? 'checked' : ''}><span class="vd-ico">${icon(ic)}</span><span class="vd-txt"><b>${esc(l)}</b><small>${esc(d)}</small></span></label>`; }).join('')}</div>
         <div class="field"><label for="rec-${a}">Recomendaciones y acciones derivadas <span class="req">*</span></label>
           <textarea id="rec-${a}" name="texto" rows="3" maxlength="1000" data-counter placeholder="Recomendación del área">${esc(r?.recomendacion || '')}</textarea></div>
-        <div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn primary">${icon('save')} ${r ? 'Actualizar' : 'Guardar'} veredicto</button></div></form>`;
+        <div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn turq">${icon('save')} ${r ? 'Actualizar' : 'Guardar'} veredicto</button></div></form>`;
     } else if (r) {
       const [l, cls, ic] = VEREDICTO[r.sentido];
       cuerpo = `<div class="verdict-done ${cls}"><span class="vd-ico">${icon(ic)}</span><div><b>${esc(l)}</b><span>${esc(r.por?.nombre || '')} · ${fmtDateTime(r.updated_at)}</span></div></div><p class="pre">${esc(r.recomendacion)}</p>`;
@@ -245,7 +244,7 @@ export async function etapaRecomendaciones(pane, ctx) {
           <div class="chips">${noPart.map((a) => `<span class="chip">${icon(AREAS[a].ico)} ${esc(AREAS[a].label)}</span>`).join('')}</div></div>` : ''}</div>
       <div class="card"><div class="card-head"><div><h3>Para pasar a dictamen</h3><p>Pasa sola a dictamen cuando todas las áreas dan su veredicto.</p></div></div>
         ${checklist([...(P.estado === 'en_ejecucion' ? [[false, 'Prueba terminada']] : []), ...part.map((a) => [listo(a), `Veredicto de ${AREAS[a].label}`])])}
-        ${TERMINADA.includes(P.estado) && completo ? `<button class="btn primary block mt" data-rc="enviar">${icon('send')} Enviar a dictamen</button>` : ''}
+        ${TERMINADA.includes(P.estado) && completo ? `<button class="btn violet block mt" data-rc="enviar">${icon('send')} Enviar a dictamen</button>` : ''}
       </div>
     </div>`;
   refreshIcons();
