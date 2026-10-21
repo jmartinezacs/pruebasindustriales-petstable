@@ -394,3 +394,8 @@ Migración `20261021002200_prubind_v53_pendientes_hechos.sql`.
 - **Seguimiento** con la foto de cada persona; **expediente** con logo, solo las secciones con datos y firmas de quien dictaminó y quien cerró.
 - **Agregar parámetro:** formulario directo (nombre, cuantitativo o cualitativo y unidad); si el nombre ya existe en el catálogo se usa ese. Catálogo depurado (5 parámetros vagos o duplicados desactivados).
 - Migraciones `20261021002300_prubind_v56_roles_pendientes_evidencias.sql` y `20261021002400_prubind_v56_muestras_dictamen.sql`; pruebas `tests/sql/pruebas_flujo_v56.sql` (13/13).
+
+## v5.7 · Registro de datos unificado y Evaluación al terminar (22/10/2026)
+- **Un solo formulario "Registrar datos"** en *En proceso*: cada parámetro se registra para toda la prueba (un valor) o, al elegir **Por batch**, con un renglón por batch (número y valor) y "Agregar batch". Los batches se crean solos con su número y se comparten entre parámetros; los que quedan sin datos se quitan.
+- La etapa **Resultados** se llama **Evaluación**, y la evaluación y el veredicto de las áreas solo se registran con la prueba **terminada** (servidor y pendientes).
+- Migración `20261022002500_prubind_v57_evaluar_al_terminar.sql`; pruebas `tests/sql/pruebas_flujo_v57.sql` (6/6).

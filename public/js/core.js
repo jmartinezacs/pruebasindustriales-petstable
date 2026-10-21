@@ -115,7 +115,7 @@ export const ESTADOS_PRUEBA = {
 // Etapas según el flujo de información acordado (narración del 20/10/2026). Desde v5.6 los análisis de
 // laboratorio y sensoriales (antes "Evaluaciones complementarias") se registran En proceso, para toda la prueba.
 export const ETAPAS = [['registro', 'Registro', 'clipboard-pen'], ['proceso', 'En proceso', 'factory'],
-  ['resultados', 'Resultados', 'list-checks'], ['recomendaciones', 'Recomendaciones', 'lightbulb'],
+  ['resultados', 'Evaluación', 'list-checks'], ['recomendaciones', 'Recomendaciones', 'lightbulb'],
   ['dictamen', 'Dictamen y aprobación', 'gavel'], ['cierre', 'Cierre', 'archive']];
 // Los análisis de laboratorio y sensoriales solo aplican a materia prima, reformulación y producto nuevo
 export const TIPOS_COMPLEMENTARIAS = ['producto_nuevo', 'cambio_formulacion', 'cambio_proveedor'];

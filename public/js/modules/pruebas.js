@@ -7,7 +7,7 @@
 // =====================================================================
 import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, nullIfEmpty, numOrNull, must, mustRow,
-  DataTable, paged, sanitizeSearch, debounce, fmtDate, fmtDateTime, fmtQty, pill, estadoPill, prioPill, puedeEn, autoridad, puedeArea,
+  DataTable, paged, sanitizeSearch, debounce, fmtDate, fmtDateTime, fmtQty, pill, estadoPill, prioPill, puedeEn, autoridad,
   getCat, invalidateCat, opciones, ESTADOS_PRUEBA, etapasDe, CERRADAS, ABIERTAS, PRIORIDADES, CAMPOS_REGISTRO, AREAS, AREAS_ORDEN, avatarHTML, emptyState, errorState,
   refreshIcons, todayISO, navigate, bindCounters, prefs, dayStartTs, dayEndTs, ayuda, avisar, fechaEjecTxt, fechaFinDe,
 } from '../core.js';
@@ -43,7 +43,7 @@ async function renderLista(params) {
   root.innerHTML = `
     <section class="page-intro">
       <div><span class="eyebrow">Seguimiento</span><h1>Pruebas industriales</h1>
-        <p>Registro → En proceso → Resultados → Recomendaciones → Dictamen → Cierre.</p></div>
+        <p>Registro → En proceso → Evaluación → Recomendaciones → Dictamen → Cierre.</p></div>
       <div class="page-actions">${btn('data-pl="csv"', 'download', 'Exportar CSV')}<button class="btn primary" data-pl="nueva">${icon('flask-conical')} Nueva prueba industrial</button></div>
     </section>
     <div class="card">
@@ -370,13 +370,11 @@ function siguientePaso() {
     ? ['Iniciar la prueba cuando esté lista.', true]
     : definir || [`Esperando a que ${P.registrado_por_nombre || 'quien registró la prueba'} la inicie.`, false];
   const misAreas = AREAS_ORDEN.filter((a) => autoridad(P.tipo, `evaluar_${a}`) || autoridad(P.tipo, `capturar_${a}`));
-  const evaluo = AREAS_ORDEN.some((a) => puedeArea(P, 'evaluar', a));
   const fin = fechaFinDe(P);
   const proceso = definir || (puedeEn(P, 'preparar') && fin && fin <= todayISO() ? ['Terminar la prueba (hoy concluye su fecha de ejecución).', true]
-    : evaluo && E.eval_faltantes > 0 ? [`Evaluar ${E.eval_faltantes} parámetro(s) ya registrados (pestaña Resultados).`, true]
-      : [misAreas.length ? 'Registrar los parámetros de su área.' : 'Las áreas registran sus parámetros.', misAreas.length > 0 || puedeEn(P, 'preparar')]);
+    : [misAreas.length ? 'Registrar los datos de su área (botón «Registrar datos»).' : 'Las áreas registran sus parámetros.', misAreas.length > 0 || puedeEn(P, 'preparar')]);
   const evalua = E.eval_faltantes > 0
-    ? [`Evaluar los parámetros de cada área (${E.eval_faltantes} pendientes).`, puedeEn(P, 'evaluar')]
+    ? [`Evaluar los parámetros de cada área (${E.eval_faltantes} pendientes, pestaña Evaluación).`, puedeEn(P, 'evaluar')]
     : [`Veredicto de cada área (${E.recom_faltantes} pendientes).`, puedeEn(P, 'evaluar')];
   const msgs = {
     registrada: definir && !puedeEn(P, 'preparar') ? definir : registro, en_preparacion: registro, preparada: registro, en_ejecucion: proceso,

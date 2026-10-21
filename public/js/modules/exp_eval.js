@@ -1,9 +1,9 @@
 // =====================================================================
-// Etapa 3 · Resultados por parámetro y etapa 4 · Veredicto y
+// Etapa 3 · Evaluación de resultados por parámetro y etapa 4 · Veredicto y
 // recomendaciones por área.
 // Cada área es independiente: su responsable (Gerente o Jefe) evalúa lo
-// suyo (✓ Cumple, ✗ No cumple o ? No se pudo determinar) en cuanto se
-// registra, aunque la prueba siga en proceso, y da su veredicto
+// suyo (✓ Cumple, ✗ No cumple o ? No se pudo determinar) cuando la prueba
+// se termina, y da su veredicto
 // (satisfactoria / no satisfactoria). Lo marcado "Pendiente" aparece para
 // que el responsable lo complete o indique que no se pudo determinar; no
 // detiene la evaluación. La prueba pasa sola al dictamen de Alta Dirección
@@ -15,7 +15,7 @@ import {
 } from '../core.js';
 import { aviso, vacio, checklist, accion, criterioTxt, campoValor, leerValor, payloadValor, eviChips } from './exp_comun.js';
 
-const EVALUA = ['en_ejecucion', 'en_evaluacion', 'pendiente_resultados'];
+const EVALUA = ['en_evaluacion', 'pendiente_resultados'];   // se evalúa con la prueba terminada
 const TERMINADA = ['en_evaluacion', 'pendiente_resultados'];
 const conValor = (r) => r.valor_num != null || !!r.valor_opcion;
 
@@ -154,7 +154,7 @@ export async function etapaResultados(pane, ctx) {
   const vis = misAreas(P);   // áreas propias abiertas y primero; las demás contraídas (se abren al tocarlas)
 
   pane.innerHTML = `${antes ? aviso('Se evalúa cuando la prueba ya inició.', '', 'circle-play') : ''}
-    ${P.estado === 'en_ejecucion' ? aviso('Puede evaluar lo que su área ya registró, sin esperar a que termine la prueba.', 'info', 'zap') : ''}
+    ${P.estado === 'en_ejecucion' ? aviso('La evaluación se hace cuando la prueba se termina. Mientras tanto puede consultar lo registrado.', 'info', 'flag') : ''}
     <div class="ev-legend">${Object.values(EVALUACION).map(([l, cls, ic]) => `<span class="ev-n ${cls}">${icon(ic)} ${esc(l)}</span>`).join('')}<span class="ev-n warn">${icon('hourglass')} Pendiente: complételo o márquelo con ?</span></div>
     ${K.areas.length ? '' : `<div class="card">${vacio('La prueba no tiene parámetros a evaluar.')}</div>`}
     ${[...K.areas].sort((x, y) => Number(!vis.includes(x)) - Number(!vis.includes(y))).map((a) => {

@@ -2,6 +2,8 @@
 -- v5.6 · Permisos por puesto, valores "Pendiente", evaluación durante el
 -- proceso, rango de fechas, terminado automático, dictamen que completa
 -- pendientes y evidencia por parámetro. Todo se REVIERTE.
+-- NOTA (v5.7): desde v5.7 la evaluación solo se registra con la prueba terminada; los
+-- pasos de este archivo que evalúan "en proceso" reflejan la regla anterior (ver pruebas_flujo_v57.sql).
 -- =====================================================================
 create or replace function pg_temp.como(p_email text) returns void language plpgsql as $$
 begin perform set_config('request.jwt.claims', json_build_object('role','authenticated','email',p_email)::text, true); end $$;
