@@ -369,3 +369,4 @@ Migración `20261021002200_prubind_v53_pendientes_hechos.sql`.
 - KPI "Pruebas cerradas" en lugar de "Urgentes abiertas"; filtro "Cerradas" en Pruebas.
 - Borde de la gráfica de pastel blanco al cambiar a modo claro; título completo "Pruebas industriales" en el celular (el botón Salir queda en el menú); subtítulo "Calidad de proceso".
 - Íconos de 48, 96, 144 y 256 px en el manifiesto (acceso directo de Windows).
+- **v5.3.1:** la campana flotante es solo la campana dorada con el número de pendientes (sin fondo). Se borró la prueba de prueba PI-2026-001 (folio reiniciado).
