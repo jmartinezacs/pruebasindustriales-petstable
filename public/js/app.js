@@ -25,7 +25,7 @@ const ROUTES = {
   abastecimiento: { mod: insumos, icon: 'package',       label: 'Abastecimiento',      roles: ['admin', 'usuario'], oculto: true },
   recetas:   { mod: recetas,   icon: 'book-open',        label: 'Recetas',             roles: ['admin', 'usuario'] },
   catalogos: { mod: catalogos, icon: 'database',         label: 'Catálogos',           roles: ['admin'], abasto: true },
-  usuarios:  { mod: usuarios,  icon: 'user-cog',         label: 'Usuarios', roles: ['admin'] },
+  usuarios:  { mod: usuarios,  icon: 'user-cog',         label: 'Usuarios',            roles: ['admin', 'usuario'] },
   bitacora:  { mod: bitacora,  icon: 'history',          label: 'Bitácora',            roles: ['admin'] },
   perfil:    { mod: perfil,    icon: 'circle-user',      label: 'Mi perfil',           roles: ['admin', 'usuario'], mobile: true },
 };

@@ -370,3 +370,10 @@ Migración `20261021002200_prubind_v53_pendientes_hechos.sql`.
 - Borde de la gráfica de pastel blanco al cambiar a modo claro; título completo "Pruebas industriales" en el celular (el botón Salir queda en el menú); subtítulo "Calidad de proceso".
 - Íconos de 48, 96, 144 y 256 px en el manifiesto (acceso directo de Windows).
 - **v5.3.1:** la campana flotante es solo la campana dorada con el número de pendientes (sin fondo). Se borró la prueba de prueba PI-2026-001 (folio reiniciado).
+
+## v5.4 · Usuarios en consulta y barra turquesa (21/10/2026)
+
+- Todos los usuarios pueden ver Usuarios y Autoridades (solo consulta); solo los administradores modifican (también lo impone RLS).
+- Barra de la app instalada (theme_color) en turquesa #1BC7C7.
+- Catálogo "Materias primas" (antes "Materias primas y materiales").
+- Panel: texto de bienvenida que explica para qué es el sitio.

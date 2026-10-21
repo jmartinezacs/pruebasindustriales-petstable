@@ -862,3 +862,6 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
 .fab-bell:hover .bell-svg { filter: drop-shadow(0 6px 10px rgba(224, 134, 0, .55)); }
 .fab-bell .bell-n { top: 2px; right: 0; min-width: 22px; height: 22px; font-size: 12px; border-color: #fff; }
 @media (max-width: 640px) { .fab-bell .bell-svg { width: 48px; height: 48px; } }
+
+/* v5.4 · Texto de bienvenida del panel */
+.page-intro .hello-sub { max-width: 640px; line-height: 1.5; }

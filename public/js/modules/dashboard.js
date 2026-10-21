@@ -44,7 +44,7 @@ export default {
       <section class="page-intro">
         <div><span class="eyebrow">Panel general</span>
           <h1 class="hello">Hola, ${esc(state.profile.nombre.split(' ')[0])} <span class="paws" aria-hidden="true">${icon('paw-print')}${icon('paw-print')}</span></h1>
-          <p>${state.isAdmin ? 'Administrador' : 'Usuario'} · lo que requiere tu intervención y el estado de las pruebas.</p></div>
+          <p class="hello-sub">Aquí se registran y siguen las pruebas industriales de Pet's Table: nuevos productos, cambios de formulación, proveedor, empaque o proceso. Cada área define y evalúa sus parámetros, y Alta Dirección emite el dictamen.</p></div>
         <div class="toolbar" style="margin:0">
           <select id="dash-period" aria-label="Periodo"><option value="mes">Mes en curso</option><option value="90">Últimos 90 días</option>
             <option value="anio">Año en curso</option><option value="12m">Últimos 12 meses</option><option value="custom">Personalizado</option></select>

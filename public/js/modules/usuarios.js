@@ -1,7 +1,7 @@
 // =====================================================================
-// Administración (solo administradores): usuarios con su puesto y matriz
-// de autoridades (puesto × tipo de prueba × acción). El rol de
-// administrador NO confiere autoridad técnica.
+// Usuarios y autoridades. Todos los usuarios pueden consultarlos; solo los
+// administradores agregan, editan, activan o desactivan usuarios y
+// autoridades (también lo impone RLS en la base de datos).
 // Alta de usuarios: se puede buscar una cuenta existente de Supabase Auth
 // (se llenan nombre, correo y foto). Si el correo no tiene cuenta, se crea
 // con una contraseña temporal mediante la Edge Function
@@ -19,13 +19,14 @@ const EMAIL_RE = /^[a-z0-9._%+-]+@petstable\.mx$/i;
 export default {
   async render(el, params) {
     root = el;
-    const tab = ['usuarios', 'autoridades'].includes(params.tab) ? params.tab : 'usuarios';
+    const admin = state.isAdmin;
+    const tab =['usuarios', 'autoridades'].includes(params.tab) ? params.tab : 'usuarios';
     const puestos = await getCat('puestos');
     el.innerHTML = `
       <section class="page-intro">
-        <div><span class="eyebrow">Administración</span><h1>Usuarios</h1>
+        <div><span class="eyebrow">${admin ? 'Administración' : 'Consulta'}</span><h1>Usuarios</h1>
           <p>Personas autorizadas, su puesto y qué registra, evalúa o dictamina cada puesto por área y tipo de prueba.</p></div>
-        <div class="page-actions"><button class="btn primary" data-u="nuevo">${icon('user-plus')} Nuevo usuario</button></div>
+        ${admin ? `<div class="page-actions"><button class="btn primary" data-u="nuevo">${icon('user-plus')} Nuevo usuario</button></div>` : ''}
       </section>
       <div class="tabs" role="tablist">
         <button role="tab" data-tab="usuarios">${icon('users')} Usuarios</button>
@@ -63,7 +64,7 @@ export default {
             ${u.id === state.profile.id ? '' : `<button class="icon-btn ${u.activo ? 'warn' : 'ok'}" data-ua="toggle" data-id="${esc(u.id)}" title="${u.activo ? 'Desactivar' : 'Activar'}" aria-label="${u.activo ? 'Desactivar' : 'Activar'}">${icon(u.activo ? 'user-x' : 'user-check')}</button>`}
           </div>`;
         } },
-      ],
+      ].filter((c) => admin || !['Último acceso', 'Acciones'].includes(c.label)),
       empty: { ico: 'user-cog', title: 'Sin usuarios', text: 'Registra a las personas autorizadas.' },
       fetch: async ({ from, to, sort, filters: f }) => {
         let q = sb.from('usuarios_prubind').select('id, email, nombre, puesto, puesto_id, foto_url, rol, activo, area_id, area:areas_prubind(nombre), puesto_cat:puestos_prubind(nombre)', { count: 'exact' });
@@ -72,7 +73,7 @@ export default {
         if (f.rol) q = q.eq('rol', f.rol);
         if (f.fun === 'sin') q = q.is('puesto_id', null); else if (f.fun) q = q.eq('puesto_id', f.fun);
         if (f.activo) q = q.eq('activo', f.activo === 'true');
-        const [res, cu] = await Promise.all([paged(q, { from, to, sort }, [['nombre', true]]), sb.rpc('prubind_estado_cuentas')]);
+        const [res, cu] = await Promise.all([paged(q, { from, to, sort }, [['nombre', true]]), admin ? sb.rpc('prubind_estado_cuentas') : { data: [] }]);
         must(res);
         if (!cu.error) cuentas = new Map((cu.data || []).map((c) => [c.email.toLowerCase(), c]));
         return { rows: res.data, count: res.count };
@@ -102,7 +103,7 @@ async function onClick(e) {
   if (t) {
     root.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('active', b === t));
     root.querySelectorAll('[data-pane]').forEach((p) => p.classList.toggle('hidden', p.dataset.pane !== t.dataset.tab));
-    root.querySelector('[data-u="nuevo"]').classList.toggle('hidden', t.dataset.tab !== 'usuarios');
+    root.querySelector('[data-u="nuevo"]')?.classList.toggle('hidden', t.dataset.tab !== 'usuarios');
     history.replaceState(null, '', `#/usuarios?tab=${t.dataset.tab}`);
     if (t.dataset.tab === 'autoridades') renderAutoridades(); else table.load();
     return;
@@ -396,18 +397,19 @@ async function renderAutoridades() {
     const tNom = (c) => (c ? tipos.find((t) => t.codigo === c)?.nombre || c : 'Todos los tipos');
     const quien = (a) => (a.puesto_id ? { ico: 'briefcase', txt: puestos.find((p) => p.id === a.puesto_id)?.nombre || '?', sub: us.data.filter((u) => u.puesto_id === a.puesto_id && u.activo).map((u) => u.nombre).join(', ') || 'Nadie tiene este puesto' }
       : { ico: 'user', txt: us.data.find((u) => u.id === a.usuario_id)?.nombre || '?', sub: 'Asignación individual' });
-    box.innerHTML = `<div class="notice">${icon('info')}<span>Define quién puede actuar en cada etapa. Los <b>administradores no tienen autoridad técnica</b> por su rol: solo la tienen si su puesto o su persona aparecen aquí. Cualquier usuario activo puede registrar pruebas.</span></div>
+    const admin = state.isAdmin;
+    box.innerHTML = `<div class="notice">${icon('info')}<span>Quién puede actuar en cada etapa, por puesto o por persona. Cualquier usuario activo puede registrar pruebas; los <b>administradores</b> pueden realizar cualquier acción.${admin ? '' : ' Esta vista es de consulta: los cambios los hace un administrador.'}</span></div>
       <div class="card"><div class="card-head"><div><h3>Autoridades</h3><p>${au.data.filter((a) => a.activo).length} asignaciones activas</p></div>
-        <button class="btn primary" data-au="nueva">${icon('plus')} Agregar autoridad</button></div>
+        ${admin ? `<button class="btn primary" data-au="nueva">${icon('plus')} Agregar autoridad</button>` : ''}</div>
       ${Object.entries(ACCIONES).map(([k, lbl]) => { const rs = au.data.filter((a) => a.accion === k);
         return `<div class="plan-grupo"><div class="section-title">${icon('key-round')} ${esc(lbl)}</div>
           ${rs.length ? `<div class="table-wrap responsive"><table class="table"><thead><tr><th>Quién</th><th>Tipo de prueba</th><th>Estado</th><th class="actions"></th></tr></thead><tbody>
           ${rs.map((a) => { const q = quien(a); return `<tr class="${a.activo ? '' : 'row-off'}"><td data-label="Quién"><div class="td-in"><div class="cell-main">${icon(q.ico)} ${esc(q.txt)}</div><div class="cell-sub">${esc(q.sub)}</div></div></td>
             <td data-label="Tipo"><div class="td-in">${esc(tNom(a.tipo))}</div></td>
             <td data-label="Estado"><div class="td-in">${a.activo ? pill('Activa', 'ok') : pill('Inactiva', 'gray')}</div></td>
-            <td class="actions" data-label=""><div class="td-in"><div class="row-actions">
+            <td class="actions" data-label=""><div class="td-in"><div class="row-actions">${admin ? `
               <button class="icon-btn ${a.activo ? 'warn' : 'ok'}" data-au="toggle" data-id="${esc(a.id)}" title="${a.activo ? 'Desactivar' : 'Activar'}" aria-label="${a.activo ? 'Desactivar' : 'Activar'}">${icon(a.activo ? 'eye-off' : 'eye')}</button>
-              <button class="icon-btn bad" data-au="eliminar" data-id="${esc(a.id)}" title="Eliminar" aria-label="Eliminar">${icon('trash-2')}</button></div></div></td></tr>`; }).join('')}
+              <button class="icon-btn bad" data-au="eliminar" data-id="${esc(a.id)}" title="Eliminar" aria-label="Eliminar">${icon('trash-2')}</button>` : ''}</div></div></td></tr>`; }).join('')}
           </tbody></table></div>` : '<p class="hint warn-txt">Nadie tiene esta autoridad: la etapa quedará detenida.</p>'}</div>`; }).join('')}</div>`;
     box._d = { au: au.data, tipos, puestos, us: us.data };
   } catch (err) {
