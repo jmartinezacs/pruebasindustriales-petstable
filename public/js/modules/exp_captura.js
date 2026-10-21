@@ -1,18 +1,21 @@
 // =====================================================================
-// Captura por unidad de prueba (batch, corrida o punto) y por sección:
-//   · proceso: lo que registran Calidad (inspectores) y Producción
-//     (supervisores) durante el proceso.
-//   · complementarias: evaluación sensorial, microbiología y bromatología.
-//   · general: Seguridad y Mantenimiento (una vez por prueba) y los
-//     parámetros del equipo.
-// Cada quien solo edita los parámetros de su área; el resto se ve en
-// modo consulta. La muestra se crea sola por unidad.
+// Captura por unidad de prueba: toda la prueba (registro general) o un
+// batch / corrida. Cada quien solo edita los parámetros de su área:
+//   · Calidad: inspectores o Jefe de Calidad.
+//   · Producción: supervisores o Gerente de Producción.
+//   · Seguridad: Supervisor o Ingeniero de Seguridad.
+//   · Mantenimiento: Jefe o técnicos de Mantenimiento.
+// Los análisis de laboratorio y sensoriales (bromatológicos, microbiología,
+// sensorial) se registran para toda la prueba. Un valor que aún no se tiene
+// se marca "Pendiente" y se completa al evaluar o en el dictamen. Cada
+// parámetro puede llevar evidencia (fotos, reportes). La muestra se crea
+// sola por unidad.
 // =====================================================================
 import {
-  sb, state, esc, icon, toast, openModal, nullIfEmpty, must, mustRow, getCat, opciones, unidadTxt, fmtDate,
-  todayISO, puedeEn, puedeArea, misAreas, OPCIONES_TXT, AREAS, AREAS_ORDEN, COMPLEMENTARIAS, ayuda,
+  sb, state, esc, icon, toast, openModal, nullIfEmpty, must, mustRow, getCat, opciones, unidadTxt,
+  todayISO, puedeEn, puedeArea, misAreas, AREAS, AREAS_ORDEN, COMPLEMENTARIAS, ayuda,
 } from '../core.js';
-import { aviso, criterioTxt, aLocal } from './exp_comun.js';
+import { aviso, criterioTxt, aLocal, eviPicker, eviChips, campoValor, leerValor, payloadValor, subirArchivos } from './exp_comun.js';
 
 const TITULO_CAT = { sensorial: 'Evaluación sensorial', microbiologia: 'Microbiología', bromatologia: 'Análisis bromatológicos (proximal)' };
 const ICO_CAT = { sensorial: 'eye', microbiologia: 'microscope', bromatologia: 'flask-round' };
@@ -21,6 +24,8 @@ export const ABIERTA = ['registrada', 'en_preparacion', 'preparada', 'en_ejecuci
 const COMPLETAR = ['en_evaluacion', 'pendiente_resultados'];
 const pad = (n) => String(n).padStart(2, '0');
 const codigoLoteHoy = () => { const d = new Date(); return `L-${pad(d.getDate())}${pad(d.getMonth() + 1)}${String(d.getFullYear()).slice(2)}`; };
+export const esLab = (m) => COMPLEMENTARIAS.includes(m?.categoria);
+const conValor = (r) => r.valor_num != null || !!r.valor_opcion;
 
 // Estado esperado según el criterio del plan (null si no hay criterio)
 function evaluar(pl, m, valor) {
@@ -42,99 +47,88 @@ function ayudaMetodo(pl, m, un) {
     m.base_expresion ? `Base ${m.base_expresion}` : ''].filter(Boolean).join(' · ');
 }
 
-// Parámetros del plan que corresponden a la unidad y la sección
-// Parámetros de la sección para cualquier unidad: cada parámetro se puede registrar
-// para toda la prueba (registro general) o por cada batch que se agregue.
-export function itemsDe(plan, met, { seccion }) {
-  return plan.filter((pl) => {
-    const m = met(pl.metodo_id);
-    if (!m) return false;
-    const compl = COMPLEMENTARIAS.includes(m.categoria);
-    return seccion === 'complementarias' ? compl : !compl;
-  });
+// Parámetros que se registran en una unidad: en "toda la prueba" van todos; por batch, todos menos los de
+// laboratorio y sensoriales (esos se registran una vez para toda la prueba).
+export function itemsDe(plan, met, { unidad = 'corrida' } = {}) {
+  return plan.filter((pl) => { const m = met(pl.metodo_id); return m && (unidad !== 'batch' || !esLab(m)); });
 }
-// ¿Los parámetros del equipo van en esta sección?
-export const conEquipo = ({ unidad, seccion }) => unidad === 'corrida' && seccion !== 'complementarias';
+// ¿Los parámetros del equipo van en esta unidad?
+export const conEquipo = ({ unidad }) => unidad === 'corrida';
 
 /**
  * @param {object} P prueba (v_pruebas)
- * @param {object} op { unidad: 'batch'|'corrida'|'punto', seccion, batch?, punto?, previo? }
+ * @param {object} op { unidad: 'batch'|'corrida', batch?, previo? }
  * @returns {Promise<false|{siguiente:boolean, previo:object}>}
  */
-export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null, punto = null, previo = null }) {
+export async function capturaForm(P, { unidad, batch = null, punto = null, previo = null }) {
   const ej = P.ejecucion_actual;
   const fab = P.ejecucion_form === 'fabricacion';
-  const equipoAqui = conEquipo({ unidad, seccion, fab });
-  const [metodos, unidades, motivos, materias, plan, muestras, resultados, lotes, nums, pars, controles] = await Promise.all([
-    getCat('metodos'), getCat('unidades'), getCat('motivos'), getCat('materias'),
+  const equipoAqui = conEquipo({ unidad });
+  const [metodos, unidades, motivos, plan, muestras, resultados, lotes, nums, pars, controles, adjs] = await Promise.all([
+    getCat('metodos'), getCat('unidades'), getCat('motivos'),
     sb.from('plan_evaluacion_prubind').select('*').eq('prueba_id', P.id).eq('incluido', true).order('orden'),
     sb.from('muestras_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej),
     sb.from('resultados_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej),
-    unidad === 'batch' && seccion === 'proceso' ? sb.from('lotes_diarios_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej).order('fecha') : { data: [] },
-    unidad === 'batch' && seccion === 'proceso' ? sb.from('batches_prubind').select('id, numero').eq('prueba_id', P.id).eq('ejecucion', ej) : { data: [] },
+    unidad === 'batch' ? sb.from('lotes_diarios_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej).order('fecha') : { data: [] },
+    unidad === 'batch' ? sb.from('batches_prubind').select('id, numero').eq('prueba_id', P.id).eq('ejecucion', ej) : { data: [] },
     equipoAqui ? sb.from('prueba_parametros_prubind').select('*').eq('prueba_id', P.id).order('orden') : { data: [] },
     equipoAqui ? sb.from('ejecucion_controles_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej) : { data: [] },
+    sb.from('adjuntos_prubind').select('id, nombre, ruta, plan_id, batch_id').eq('prueba_id', P.id).not('plan_id', 'is', null),
   ]);
-  [plan, muestras, resultados, lotes, nums, pars, controles].forEach((r) => { if (r.error) throw r.error; });
+  [plan, muestras, resultados, lotes, nums, pars, controles, adjs].forEach((r) => { if (r.error) throw r.error; });
   const un = (id) => unidadTxt(unidades, id);
   const met = (id) => metodos.find((m) => m.id === id);
-  const mpNom = (id) => materias.find((m) => m.id === id)?.nombre || '';
   const motDesv = motivos.filter((m) => m.tipo === 'desviacion');
 
   // Permisos: cada área captura lo suyo durante el proceso; los resultados se pueden completar hasta la evaluación
   const abierta = P.estado === 'en_ejecucion';
   const enCaptura = abierta || COMPLETAR.includes(P.estado);
-  const capArea = (area) => enCaptura && (puedeArea(P, 'capturar', area) || puedeArea(P, 'evaluar', area) || P.responsable_ejecucion_id === state.profile.id);
+  const capArea = (area) => enCaptura && (puedeArea(P, 'capturar', area) || puedeArea(P, 'evaluar', area));
   const ejecuta = abierta && puedeEn(P, 'ejecutar');            // alta de batches y datos generales del batch
-  const equipoEdit = abierta && capArea('produccion') && puedeEn(P, 'ejecutar');
+  const equipoEdit = abierta && capArea('produccion');
 
-  const muestra = muestras.data.find((s) => (unidad === 'batch' ? s.nivel === 'batch' && s.batch_id === batch?.id
-    : unidad === 'punto' ? s.punto_id === punto?.id : s.nivel === 'corrida'));
+  const muestra = muestras.data.find((s) => (unidad === 'batch' ? s.nivel === 'batch' && s.batch_id === batch?.id : s.nivel === 'corrida'));
   const R = muestra ? resultados.data.filter((r) => r.muestra_id === muestra.id) : [];
+  const evid = (pl) => adjs.data.filter((a) => a.plan_id === pl.id && (a.batch_id || null) === (unidad === 'batch' ? batch?.id || '' : null));
+  // Por batch también aparecen los de laboratorio que ya tengan algo registrado en ese batch (registros anteriores)
+  const todosItems = plan.data.filter((pl) => { const m = met(pl.metodo_id); return m && (unidad !== 'batch' || !esLab(m) || R.some((r) => r.plan_id === pl.id)); });
   // Solo se muestran las áreas de quien registra (el administrador y quien solo consulta ven todas)
-  const todosItems = itemsDe(plan.data, met, { unidad, seccion, fab });
   const editablesTodos = todosItems.filter((pl) => capArea(met(pl.metodo_id).area));
   const verAreas = new Set([...misAreas(P), ...editablesTodos.map((pl) => met(pl.metodo_id).area)]);
   const items = todosItems.filter((pl) => verAreas.has(met(pl.metodo_id).area));
   const ocultas = todosItems.length - items.length;
   const editables = items.filter((pl) => capArea(met(pl.metodo_id).area));
+  const esPendiente = (pl) => { const xs = R.filter((r) => r.plan_id === pl.id); return xs.length > 0 && !xs.some(conValor); };
 
-  // Apartados por área (Calidad, complementarias por categoría, Producción, Seguridad, Mantenimiento)
-  const clave = (m) => (COMPLEMENTARIAS.includes(m.categoria) ? m.categoria : m.area);
+  // Apartados por área; dentro de Calidad, laboratorio y sensorial por categoría
+  const clave = (m) => (esLab(m) ? m.categoria : m.area);
   const ORDEN = ['calidad', ...COMPLEMENTARIAS, 'produccion', 'seguridad', 'mantenimiento'];
   const grupos = {};
   items.forEach((pl) => { (grupos[clave(met(pl.metodo_id))] ||= []).push(pl); });
   const secciones = Object.keys(grupos).sort((a, b) => ORDEN.indexOf(a) - ORDEN.indexOf(b));
-  const tituloSec = (k) => (TITULO_CAT[k] ? `${icon(ICO_CAT[k])} ${esc(TITULO_CAT[k])}` : `${icon(AREAS[k].ico)} ${esc(AREAS[k].label)}`);
+  const tituloSec = (k) => (TITULO_CAT[k] ? `${icon(ICO_CAT[k])} ${esc(TITULO_CAT[k])} <span class="cell-sub">· Calidad</span>` : `${icon(AREAS[k].ico)} ${esc(AREAS[k].label)}`);
 
   // ---------- Campo de cada parámetro ----------
   const campo = (pl) => {
-    const m = met(pl.metodo_id); const u = un(m.unidad_id); const dis = capArea(m.area) ? '' : 'disabled';
-    const r1 = R.find((r) => r.plan_id === pl.id && !r.dilucion);
+    const m = met(pl.metodo_id); const u = un(m.unidad_id); const edit = capArea(m.area);
     const etiqueta = `${esc(m.nombre)}${u && u !== m.nombre && m.tipo_resultado !== 'diluciones' ? ` <span class="cell-sub">(${esc(u)})</span>` : ''} ${ayuda(ayudaMetodo(pl, m, u))}`;
-    let input;
-    if (m.tipo_resultado === 'diluciones') {
-      input = `<div class="dil-grid">${m.diluciones.map((d, i) => { const r = R.find((x) => x.plan_id === pl.id && x.dilucion === d);
-        return `<label>${esc(d)} <span class="cell-sub">${esc(u || 'UFC/g')}</span><input type="number" step="any" min="0" inputmode="decimal" name="r_${pl.id}_${i}" value="${esc(r?.valor_num ?? '')}" ${dis}></label>`; }).join('')}</div>`;
-    } else if (m.tipo_resultado === 'numerico') {
-      input = `<input type="number" step="any" inputmode="decimal" name="r_${pl.id}" value="${esc(r1?.valor_num ?? '')}" ${dis} placeholder="${esc(criterioTxt(pl, u) || '')}">`;
-    } else {
-      const ops = m.tipo_resultado === 'presencia' ? ['ausencia', 'presencia'] : ((m.opciones || []).length ? m.opciones.filter((o) => o !== 'pendiente') : ['conforme', 'no_conforme', 'no_aplica']);
-      input = `<select name="r_${pl.id}" data-native ${dis}><option value="">Sin registrar</option>${ops.map((o) => `<option value="${esc(o)}" ${r1?.valor_opcion === o ? 'selected' : ''}>${esc(OPCIONES_TXT[o] || o)}</option>`).join('')}</select>`;
-    }
+    const pend = esPendiente(pl);
+    const vals = R.filter((r) => r.plan_id === pl.id && conValor(r));
     const just = R.find((r) => r.plan_id === pl.id && r.justificacion)?.justificacion || '';
-    return `<div class="cap-item" data-pl="${esc(pl.id)}">
+    return `<div class="cap-item ${pend ? 'is-pend' : ''}" data-pl="${esc(pl.id)}">
       <div class="cap-lbl">${etiqueta}${m.codigo === 'SEN-SABOR' ? '<div class="cell-sub warn-txt">Solo conforme al protocolo autorizado y en condiciones de inocuidad.</div>' : ''}</div>
-      <div class="cap-in">${input}</div>
-      <div class="cap-just hidden"><input name="j_${pl.id}" maxlength="500" value="${esc(just)}" placeholder="No cumple: explique brevemente *" aria-label="Explicación de ${esc(m.nombre)}" ${dis}></div>
+      <div class="cap-in">${campoValor(m, `r_${pl.id}`, { valores: vals, unidad: u, placeholder: criterioTxt(pl, u) || '', disabled: !edit || pend })}</div>
+      ${edit ? `<div class="cap-tools"><label class="pend-tg" title="Aún no se tiene el valor; se completa después"><input type="checkbox" name="pd_${esc(pl.id)}" ${pend ? 'checked' : ''}>${icon('hourglass')}<span>Pendiente</span></label>
+        ${eviPicker(`f_${pl.id}`, evid(pl))}</div>` : evid(pl).length ? `<div class="cap-tools">${eviChips(evid(pl))}</div>` : ''}
+      <div class="cap-just hidden"><input name="j_${pl.id}" maxlength="500" value="${esc(just)}" placeholder="No cumple: explique brevemente *" aria-label="Explicación de ${esc(m.nombre)}" ${edit ? '' : 'disabled'}></div>
     </div>`;
   };
 
-  // ---------- Datos del batch (solo en el registro durante el proceso) ----------
+  // ---------- Datos del batch ----------
   const loteHoy = lotes.data.find((l) => l.fecha === todayISO());
   const nuevo = unidad === 'batch' && !batch;
   let cabecera = '';
-  if (unidad === 'batch' && seccion === 'proceso') {
+  if (unidad === 'batch') {
     const dis = ejecuta ? '' : 'disabled';
     const nounL = fab ? 'batch' : 'corrida';
     // Número de batch según la programación del día (p. ej. 29, 30, 31); se sugiere el siguiente
@@ -166,27 +160,30 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
           <div class="cap-just hidden"><input name="pj_${x.id}" maxlength="500" value="${esc(c?.observaciones || '')}" placeholder="Fuera de rango: explique brevemente *" ${dis}></div></div>`; }).join('')}`;
   }
 
-  const puedeAlgo = editables.length > 0 || (unidad === 'batch' && seccion === 'proceso' && ejecuta) || (equipoHTML && equipoEdit);
+  const puedeAlgo = editables.length > 0 || (unidad === 'batch' && ejecuta) || (equipoHTML && equipoEdit);
   const noun = fab ? 'Batch' : 'Corrida';
-  const titulo = unidad === 'batch' ? (batch ? `${noun} #${batch.numero}` : `Nuevo ${noun.toLowerCase()}`) : unidad === 'punto' ? `Punto: ${punto.nombre}` : 'Toda la prueba (registro general)';
+  const titulo = unidad === 'batch' ? (batch ? `${noun} #${batch.numero}` : `Nuevo ${noun.toLowerCase()}`) : unidad === 'punto' ? `Punto: ${punto.nombre}` : 'Toda la prueba';
   return openModal({
-    title: `${titulo}${seccion === 'complementarias' && unidad === 'batch' ? ' · complementarias' : ''}`, subtitle: `${P.folio} · ${P.cambio}`, size: 'lg', submitText: puedeAlgo ? 'Guardar' : 'Cerrar',
+    title: titulo, subtitle: `${P.folio} · ${P.cambio}`, size: 'lg', submitText: puedeAlgo ? 'Guardar' : 'Cerrar',
     body: `<div class="unit-banner ${unidad === 'batch' ? 'is-batch' : 'is-general'}"><span class="ub-ico">${icon(unidad === 'batch' ? 'package' : 'layers')}</span>
-        <div><small>Registrando en</small><b>${esc(titulo)}</b><span>${unidad === 'batch' ? `Valores de este ${fab ? 'batch' : 'corrida'}.` : 'Lo que se mide una sola vez.'}</span></div></div>${!puedeAlgo ? aviso('Solo consulta: cada área registra sus propios parámetros.') : editables.length < items.length ? `<p class="hint">Los parámetros de otras áreas son solo de consulta.</p>` : ''}${ocultas ? `<p class="hint">${icon('eye-off')} Solo se muestran los parámetros de su área.</p>` : ''}
+        <div><small>Registrando en</small><b>${esc(titulo)}</b><span>${unidad === 'batch' ? `Valores de este ${fab ? 'batch' : 'corrida'}.` : 'Lo que se mide una sola vez, incluidos laboratorio y sensorial.'}</span></div></div>${!puedeAlgo ? aviso('Solo consulta: cada área registra sus propios parámetros.') : editables.length < items.length ? '<p class="hint">Los parámetros de otras áreas son solo de consulta.</p>' : ''}${ocultas ? `<p class="hint">${icon('eye-off')} Solo se muestran los parámetros de su área.</p>` : ''}
       <div class="form-grid">${cabecera}${equipoHTML}
-      ${secciones.map((k) => `<div class="form-section">${tituloSec(k)}${k === 'microbiologia' ? ` ${ayuda('Capture cada dilución leída en UFC/g. Puede dejar en blanco lo que aún no tenga lectura y completarlo después.')}` : ''}${k === 'bromatologia' ? ` <span class="sec-note">${icon('hourglass')} Puede quedar pendiente de laboratorio</span>` : ''}</div>
+      ${secciones.map((k) => `<div class="form-section">${tituloSec(k)}${k === 'microbiologia' ? ` ${ayuda('Capture cada dilución leída en UFC/g. Lo que aún no tenga lectura márquelo como Pendiente.')}` : ''}</div>
         <div class="cap-grid">${grupos[k].map(campo).join('')}</div>`).join('')}
-      ${!secciones.length && !equipoHTML ? '<p class="hint full">No hay parámetros para registrar en esta sección.</p>' : ''}
+      ${!secciones.length && !equipoHTML ? '<p class="hint full">No hay parámetros para registrar aquí.</p>' : ''}
       ${nuevo ? '<label class="check full"><input type="checkbox" name="siguiente" checked> Al guardar, capturar el siguiente batch</label>' : ''}
       </div>
-      <p class="hint">Puede dejar campos vacíos y completarlos después.</p>`,
+      ${editables.length ? `<p class="hint">${icon('hourglass')} Marque <b>Pendiente</b> lo que aún no tenga (p. ej. resultados de laboratorio).</p>` : ''}`,
     onOpen: ({ form }) => {
       const sync = () => {
         const op = form.querySelector('input[name=op]:checked')?.value;
         form.querySelector('#cp-inc-w')?.classList.toggle('hidden', op !== 'no_conforme');
         form.querySelectorAll('.cap-item[data-pl]').forEach((w) => {
           const pl = items.find((x) => x.id === w.dataset.pl); const m = met(pl.metodo_id);
-          const vals = [...w.querySelectorAll(`[name^="r_${pl.id}"]`)].map((i) => i.value).filter((v) => v !== '');
+          const pend = !!form.elements[`pd_${pl.id}`]?.checked;
+          w.classList.toggle('is-pend', pend);
+          if (capArea(m.area)) w.querySelectorAll(`.cap-in [name^="r_${pl.id}"]`).forEach((i) => { i.disabled = pend; });
+          const vals = pend ? [] : [...w.querySelectorAll(`[name^="r_${pl.id}"]`)].map((i) => i.value).filter((v) => v !== '');
           const nc = vals.some((v) => evaluar(pl, m, v) === 'no_conforme');
           w.querySelector('.cap-just').classList.toggle('hidden', !nc);
           w.classList.toggle('nc', !!nc);
@@ -206,17 +203,17 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
       const f = form.elements;
       const faltaJust = [...form.querySelectorAll('.cap-just:not(.hidden) input:not([disabled])')].find((i) => !i.value.trim());
       if (faltaJust) { faltaJust.focus(); setError('Explique brevemente los valores que no cumplen.'); return false; }
-      if (unidad === 'batch' && seccion === 'proceso' && ejecuta) {
+      if (unidad === 'batch' && ejecuta) {
         const n = Number(f.numero.value);
         if (!Number.isInteger(n) || n < 1 || n > 999) { f.numero.focus(); setError(`Indique el número de ${fab ? 'batch' : 'corrida'} (1 a 999).`); return false; }
         if (nums.data.some((b) => b.numero === n && b.id !== batch?.id)) { f.numero.focus(); setError(`Ya existe el ${fab ? 'batch' : 'corrida'} número ${n} en esta prueba.`); return false; }
+        if (f.op?.value === 'no_conforme' && !f.inc.value.trim()) { f.inc.focus(); setError('Describa qué pasó en el batch.'); return false; }
       }
-      if (unidad === 'batch' && seccion === 'proceso' && ejecuta && f.op?.value === 'no_conforme' && !f.inc.value.trim()) { f.inc.focus(); setError('Describa qué pasó en el batch.'); return false; }
 
       // 1. Batch (alta o datos generales)
       let batchId = batch?.id;
       let loteId = null;
-      if (unidad === 'batch' && seccion === 'proceso' && ejecuta) {
+      if (unidad === 'batch' && ejecuta) {
         const datos = { numero: Number(f.numero.value), resultado_op: f.op?.value || 'conforme', motivo_desviacion_id: f.op?.value === 'no_conforme' ? nullIfEmpty(f.motivo.value) : null,
           incidencias: f.op?.value === 'no_conforme' ? nullIfEmpty(f.inc.value) : null };
         if (nuevo) {
@@ -244,17 +241,25 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
       }
 
       // 3. Resultados de los parámetros (solo los del área de quien captura)
+      const archivos = editables.map((pl) => [pl, [...(f[`f_${pl.id}`]?.files || [])]]).filter(([, xs]) => xs.length);
+      let muestraId = muestra?.id;
       if (editables.length) {
         const cambios = [];
         for (const pl of editables) {
           const m = met(pl.metodo_id);
+          const previos = R.filter((r) => r.plan_id === pl.id);
+          // Pendiente: se guarda un resultado sin valor (y se quitan los valores que hubiera)
+          if (f[`pd_${pl.id}`]?.checked) {
+            if (previos.length && !previos.some(conValor)) continue;
+            previos.forEach((r) => cambios.push(['del', r.id]));
+            cambios.push(['ins', null, { plan_id: pl.id, metodo_id: m.id, dilucion: m.tipo_resultado === 'diluciones' ? m.diluciones[0] : null, valor_num: null, valor_opcion: null, estado: 'pendiente' }]);
+            continue;
+          }
           const just = nullIfEmpty(f[`j_${pl.id}`]?.value.trim());
-          const entradas = m.tipo_resultado === 'diluciones' ? m.diluciones.map((d, i) => ({ d, v: f[`r_${pl.id}_${i}`].value }))
-            : [{ d: null, v: f[`r_${pl.id}`].value }];
-          for (const { d, v } of entradas) {
-            const previoR = R.find((r) => r.plan_id === pl.id && (r.dilucion || null) === d);
+          for (const { d, v } of leerValor(form, m, `r_${pl.id}`)) {
+            const previoR = previos.find((r) => (r.dilucion || null) === d);
             if (v === '') { if (previoR) cambios.push(['del', previoR.id]); continue; }
-            const payload = m.tipo_resultado === 'numerico' || m.tipo_resultado === 'diluciones' ? { valor_num: Number(v) } : { valor_opcion: v };
+            const payload = { ...payloadValor(m, v) };
             payload.estado = evaluar(pl, m, v) || 'pendiente';
             payload.justificacion = payload.estado === 'no_conforme' ? (just || previoR?.justificacion || null) : null;
             if (previoR) {
@@ -264,18 +269,25 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
             } else cambios.push(['ins', null, { ...payload, plan_id: pl.id, metodo_id: m.id, dilucion: d }]);
           }
         }
-        if (cambios.length) {
-          let muestraId = muestra?.id;
-          if (!muestraId && cambios.some(([t]) => t === 'ins')) {
-            muestraId = must(await sb.from('muestras_prubind').insert({ prueba_id: P.id, nivel: unidad === 'batch' ? 'batch' : unidad, codigo: '', fecha_muestreo: todayISO(),
-              batch_id: unidad === 'batch' ? batchId : null, punto_id: unidad === 'punto' ? punto.id : null }).select('id').single()).data.id;
-          }
-          for (const [t, id, payload] of cambios) {
-            if (t === 'del') mustRow(await sb.from('resultados_prubind').delete().eq('id', id).select('id'));
-            else if (t === 'upd') mustRow(await sb.from('resultados_prubind').update(payload).eq('id', id).select('id'));
-            else must(await sb.from('resultados_prubind').insert({ ...payload, prueba_id: P.id, muestra_id: muestraId, capturado_por: state.profile.id }));
-          }
+        const nuevaMuestra = async () => must(await sb.from('muestras_prubind').insert({ prueba_id: P.id, nivel: unidad === 'batch' ? 'batch' : unidad, codigo: '', fecha_muestreo: todayISO(),
+          batch_id: unidad === 'batch' ? batchId : null, punto_id: unidad === 'punto' ? punto.id : null }).select('id').single()).data.id;
+        if (!muestraId && (cambios.some(([t]) => t === 'ins') || archivos.length)) muestraId = await nuevaMuestra();
+        // Primero se borra (un "Pendiente" reemplaza los valores anteriores)
+        for (const [t, id] of cambios.filter(([t]) => t === 'del')) mustRow(await sb.from('resultados_prubind').delete().eq('id', id).select('id'));
+        for (const [t, id, payload] of cambios.filter(([t]) => t !== 'del')) {
+          if (t === 'upd') mustRow(await sb.from('resultados_prubind').update(payload).eq('id', id).select('id'));
+          else must(await sb.from('resultados_prubind').insert({ ...payload, prueba_id: P.id, muestra_id: muestraId, capturado_por: state.profile.id }));
         }
+      }
+
+      // 4. Evidencia de cada parámetro
+      if (archivos.length) {
+        const { data: rs } = must(await sb.from('resultados_prubind').select('id, plan_id').eq('muestra_id', muestraId));
+        let n = 0;
+        for (const [pl, files] of archivos) {
+          n += await subirArchivos(P, files, { plan_id: pl.id, batch_id: unidad === 'batch' ? batchId : null, resultado_id: rs.find((r) => r.plan_id === pl.id)?.id || null, etapa: 'ejecucion' });
+        }
+        if (n) toast(`${n} evidencia(s) adjuntada(s).`, 'success');
       }
       toast(nuevo ? 'Batch registrado.' : 'Registro guardado.', 'success');
       return { siguiente: nuevo && !!f.siguiente?.checked, previo };
@@ -285,7 +297,7 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
 
 // Avance de captura: [con resultado, total]
 export function avanceUnidad(items, R) {
-  const hechos = items.filter((pl) => R.some((r) => r.plan_id === pl.id && (r.valor_num != null || r.valor_opcion))).length;
+  const hechos = items.filter((pl) => R.some((r) => r.plan_id === pl.id && conValor(r))).length;
   return [hechos, items.length];
 }
 // Áreas presentes en una lista de parámetros

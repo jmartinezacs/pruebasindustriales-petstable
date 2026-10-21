@@ -112,20 +112,25 @@ export const ESTADOS_PRUEBA = {
   cerrada_rechazada:    { label: 'Cerrada y rechazada',      cls: 'bad',    etapa: 8 },
   cancelada:            { label: 'Cancelada',                cls: 'bad',    etapa: 0 },
 };
-// Etapas según el flujo de información acordado (narración del 20/10/2026)
+// Etapas según el flujo de información acordado (narración del 20/10/2026). Desde v5.6 los análisis de
+// laboratorio y sensoriales (antes "Evaluaciones complementarias") se registran En proceso, para toda la prueba.
 export const ETAPAS = [['registro', 'Registro', 'clipboard-pen'], ['proceso', 'En proceso', 'factory'],
-  ['complementarias', 'Evaluaciones complementarias', 'microscope'], ['resultados', 'Resultados', 'list-checks'],
-  ['recomendaciones', 'Recomendaciones', 'lightbulb'], ['dictamen', 'Dictamen y aprobación', 'gavel'], ['cierre', 'Cierre', 'archive']];
-// Las evaluaciones complementarias solo aplican a materia prima, reformulación y producto nuevo
+  ['resultados', 'Resultados', 'list-checks'], ['recomendaciones', 'Recomendaciones', 'lightbulb'],
+  ['dictamen', 'Dictamen y aprobación', 'gavel'], ['cierre', 'Cierre', 'archive']];
+// Los análisis de laboratorio y sensoriales solo aplican a materia prima, reformulación y producto nuevo
 export const TIPOS_COMPLEMENTARIAS = ['producto_nuevo', 'cambio_formulacion', 'cambio_proveedor'];
-export const etapasDe = (tipo) => ETAPAS.filter(([k]) => k !== 'complementarias' || TIPOS_COMPLEMENTARIAS.includes(tipo));
+export const etapasDe = () => ETAPAS;
+// Fecha de ejecución: un día o un rango
+export const fechaEjecTxt = (p) => (!p?.fecha_planeada ? '' : p.fecha_fin && p.fecha_fin !== p.fecha_planeada
+  ? `${fmtDate(p.fecha_planeada)} al ${fmtDate(p.fecha_fin)}` : fmtDate(p.fecha_planeada));
+export const fechaFinDe = (p) => p?.fecha_fin || p?.fecha_planeada || null;
 export const COMPLEMENTARIAS = ['sensorial', 'microbiologia', 'bromatologia'];
 // Áreas que registran y evalúan parámetros
 export const AREAS = {
-  calidad:       { label: 'Calidad',       desc: 'Calidad del producto: proceso, inocuidad y análisis de laboratorio', captura: 'Inspectores de Calidad',                    evalua: 'Jefe de Calidad',                            ico: 'flask-conical' },
-  produccion:    { label: 'Producción',    desc: 'Rendimiento y condiciones de fabricación', captura: 'Supervisores de Producción',                evalua: 'Gerente de Producción',                      ico: 'hard-hat' },
-  seguridad:     { label: 'Seguridad',     desc: 'Seguridad del personal y del área de trabajo', captura: 'Supervisor de Seguridad, Salud y Ambiente', evalua: 'Supervisor de Seguridad, Salud y Ambiente', ico: 'shield-check' },
-  mantenimiento: { label: 'Mantenimiento', desc: 'Funcionamiento de máquinas y equipos', captura: 'Jefe de Mantenimiento',                     evalua: 'Jefe de Mantenimiento',                      ico: 'wrench' },
+  calidad:       { label: 'Calidad',       desc: 'Calidad del producto: proceso, inocuidad y análisis de laboratorio', captura: 'Inspectores o Jefe de Calidad',                       evalua: 'Jefe de Calidad',                            ico: 'flask-conical' },
+  produccion:    { label: 'Producción',    desc: 'Rendimiento y condiciones de fabricación', captura: 'Supervisores o Gerente de Producción',               evalua: 'Gerente de Producción',                      ico: 'hard-hat' },
+  seguridad:     { label: 'Seguridad',     desc: 'Seguridad del personal y del área de trabajo', captura: 'Supervisor o Ingeniero de Seguridad',            evalua: 'Supervisor de Seguridad, Salud y Ambiente', ico: 'shield-check' },
+  mantenimiento: { label: 'Mantenimiento', desc: 'Funcionamiento de máquinas y equipos', captura: 'Jefe o técnicos de Mantenimiento',                   evalua: 'Jefe de Mantenimiento',                      ico: 'wrench' },
 };
 export const AREAS_ORDEN = ['calidad', 'produccion', 'seguridad', 'mantenimiento'];
 // Evaluación de cada parámetro: [texto, clase, ícono]
@@ -310,7 +315,8 @@ export function openModal({ title, subtitle = '', body = '', submitText = 'Guard
 export function confirmDialog({ title, message = '', html = '', confirmText = 'Confirmar', danger = false, input = null }) {
   const body = `${html || `<p style="margin:0 0 6px">${esc(message)}</p>`}
     ${input ? `<div class="field"><label for="cd-input">${esc(input.label)} ${input.required ? '<span class="req">*</span>' : ''}</label>
-      <textarea id="cd-input" name="value" maxlength="${input.maxlength || 300}" ${input.required ? 'required' : ''} placeholder="${esc(input.placeholder || '')}"></textarea></div>` : ''}`;
+      ${input.type ? `<input id="cd-input" name="value" type="${esc(input.type)}" value="${esc(input.value || '')}" ${input.min ? `min="${esc(input.min)}"` : ''} ${input.required ? 'required' : ''}>`
+        : `<textarea id="cd-input" name="value" maxlength="${input.maxlength || 300}" ${input.required ? 'required' : ''} placeholder="${esc(input.placeholder || '')}">${esc(input.value || '')}</textarea>`}</div>` : ''}`;
   return openModal({
     title, body, submitText: confirmText, danger, size: 'sm', confirmDiscard: false,
     onSubmit: ({ form }) => {

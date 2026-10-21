@@ -1,19 +1,19 @@
 // =====================================================================
 // Pruebas industriales: lista, registro (etapa 1) y expediente por etapas
-// Registro → En proceso → Evaluaciones complementarias →
-// Resultados → Recomendaciones → Dictamen → Cierre.
+// Registro → En proceso → Resultados → Recomendaciones → Dictamen → Cierre.
 // Cualquier persona registra la prueba (quien primero tenga conocimiento
-// de ella) con los parámetros a evaluar por área.
+// de ella); los parámetros a evaluar los define el responsable de cada área.
+// La evidencia se adjunta en cada parámetro al registrar y en el dictamen.
 // =====================================================================
 import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, nullIfEmpty, numOrNull, must, mustRow,
-  DataTable, paged, sanitizeSearch, debounce, fmtDate, fmtDateTime, fmtQty, pill, estadoPill, prioPill, puedeEn, autoridad,
+  DataTable, paged, sanitizeSearch, debounce, fmtDate, fmtDateTime, fmtQty, pill, estadoPill, prioPill, puedeEn, autoridad, puedeArea,
   getCat, invalidateCat, opciones, ESTADOS_PRUEBA, etapasDe, CERRADAS, ABIERTAS, PRIORIDADES, CAMPOS_REGISTRO, AREAS, AREAS_ORDEN, avatarHTML, emptyState, errorState,
-  refreshIcons, todayISO, navigate, bindCounters, prefs, fmtBytes, dayStartTs, dayEndTs, ayuda, avisar,
+  refreshIcons, todayISO, navigate, bindCounters, prefs, dayStartTs, dayEndTs, ayuda, avisar, fechaEjecTxt, fechaFinDe,
 } from '../core.js';
-import { box, txt, cardHead, btn, iconBtn, aviso, vacio, accion, subirEvidencia, abrirAdjunto } from './exp_comun.js';
+import { box, txt, cardHead, btn, iconBtn, aviso, vacio, accion } from './exp_comun.js';
 import { montarSelector, montarParametrosPrueba } from './exp_registro.js';
-import { etapaProceso, etapaComplementarias } from './exp_ejec.js';
+import { etapaProceso } from './exp_ejec.js';
 import { etapaResultados, etapaRecomendaciones } from './exp_eval.js';
 import { etapaDictamen, etapaCierre } from './exp_dict.js';
 
@@ -33,7 +33,6 @@ export const etapaDe = (estado, e = {}) => ({ registrada: 'registro', en_prepara
   en_evaluacion: e.eval_faltantes > 0 ? 'resultados' : 'recomendaciones', pendiente_resultados: e.eval_faltantes > 0 ? 'resultados' : 'recomendaciones',
   pendiente_dictamen: 'dictamen', requiere_repeticion: 'dictamen', aprobada: 'cierre', rechazada: 'cierre',
   cerrada_aprobada: 'fin', cerrada_rechazada: 'fin', cancelada: 'registro' }[estado] || 'registro');
-const ETAPA_EVIDENCIA = { proceso: 'ejecucion', complementarias: 'ejecucion', resultados: 'evaluacion', recomendaciones: 'evaluacion', dictamen: 'dictamen', cierre: 'cierre', fin: 'cierre', registro: 'registro' };
 const objetoTxt = (p) => [p.receta_nombre || p.producto_nombre, p.materia_prima_nombre,
   p.proveedor_nombre, p.equipo_nombre, p.empaque, p.proceso].filter(Boolean).join(' · ');
 
@@ -44,7 +43,7 @@ async function renderLista(params) {
   root.innerHTML = `
     <section class="page-intro">
       <div><span class="eyebrow">Seguimiento</span><h1>Pruebas industriales</h1>
-        <p>Registro → En proceso → Evaluaciones complementarias → Resultados → Recomendaciones → Dictamen → Cierre.</p></div>
+        <p>Registro → En proceso → Resultados → Recomendaciones → Dictamen → Cierre.</p></div>
       <div class="page-actions">${btn('data-pl="csv"', 'download', 'Exportar CSV')}<button class="btn primary" data-pl="nueva">${icon('flask-conical')} Nueva prueba industrial</button></div>
     </section>
     <div class="card">
@@ -205,7 +204,9 @@ export async function openRegistro(p = null) {
         <div class="field" data-campo="proveedor"><label for="rg-prov">Proveedor</label><select id="rg-prov" name="proveedor_id">${conNuevo('proveedor_id', p?.proveedor_id)}</select></div>
         <div class="field" data-campo="empaque"><label for="rg-emp">Material de empaque a probar</label><input id="rg-emp" name="empaque" maxlength="200" value="${esc(p?.empaque || '')}" placeholder="Ej. Film Chicken Chase formato 4x2"></div>
         <div class="field" data-campo="proceso"><label for="rg-proc">Proceso que cambia</label><input id="rg-proc" name="proceso" maxlength="200" value="${esc(p?.proceso || '')}"></div>
-        <div class="field"><label for="rg-fecha">Fecha de ejecución</label><input id="rg-fecha" name="fecha_planeada" type="date" value="${esc(p?.fecha_planeada || '')}"></div>
+        <div class="field full"><span class="label">Fecha de ejecución <span class="req">*</span> ${ayuda('Un solo día o de una fecha a otra. Si no se termina antes, la prueba se termina sola al acabar el último día.')}</span>
+          <div class="date-range-in"><input id="rg-fecha" name="fecha_planeada" type="date" required aria-label="Desde" value="${esc(p?.fecha_planeada || '')}">
+            <span>al</span><input id="rg-fecha2" name="fecha_fin" type="date" aria-label="Hasta (opcional)" value="${esc(p?.fecha_fin || '')}"><small class="hint">Deje la segunda vacía si es un solo día.</small></div></div>
 
         ${paso(2, 'Prioridad', 'Qué tan pronto debe atenderse')}
         <div class="field full"><div class="prio-seg" role="radiogroup" aria-label="Prioridad">${Object.entries(PRIO).map(([k, [l]]) => `<label class="prio-${k}"><input type="radio" name="prioridad" value="${k}" ${k === (p?.prioridad || 'normal') ? 'checked' : ''}>
@@ -270,7 +271,8 @@ export async function openRegistro(p = null) {
     },
     onSubmit: async ({ form }) => {
       const prioridad = form.querySelector('input[name=prioridad]:checked')?.value || 'normal';
-      if (!checkForm(form, { prioridad_just: (v) => (prioridad !== 'normal' && !v.trim() ? 'Explique el motivo de la prioridad.' : '') })) return false;
+      if (!checkForm(form, { prioridad_just: (v) => (prioridad !== 'normal' && !v.trim() ? 'Explique el motivo de la prioridad.' : ''),
+        fecha_fin: (v) => (v && v < form.elements.fecha_planeada.value ? 'La fecha final no puede ser anterior a la inicial.' : '') })) return false;
       const v = formValues(form);
       const t = c.tipos.find((x) => x.codigo === (p?.tipo || v.tipo));
       const campo = (k, val) => ((t?.campos_registro || []).includes(k) && val !== NUEVO ? nullIfEmpty(val) : null);
@@ -281,7 +283,7 @@ export async function openRegistro(p = null) {
         prioridad, prioridad_just: prioridad === 'normal' ? null : v.prioridad_just,
         receta_version_id: campo('receta', v.receta_version_id), materia_prima_id: campo('materia_prima', v.materia_prima_id),
         proveedor_id: campo('proveedor', v.proveedor_id), empaque: campo('empaque', v.empaque), proceso: campo('proceso', v.proceso),
-        fecha_planeada: nullIfEmpty(v.fecha_planeada),
+        fecha_planeada: nullIfEmpty(v.fecha_planeada), fecha_fin: nullIfEmpty(v.fecha_fin),
       };
       if (p) { mustRow(await sb.from('pruebas_prubind').update(payload).eq('id', p.id).select('id')); toast('Registro actualizado.', 'success'); return true; }
       const { data } = must(await sb.from('pruebas_prubind').insert({ ...payload, tipo: v.tipo, registrado_por: state.profile.id }).select('id, folio').single());
@@ -317,7 +319,7 @@ async function renderDetalle(id, tab) {
     refreshIcons(); return;
   }
   // Pestañas de versiones anteriores
-  const ALIAS_TAB = { preparacion: 'registro', ejecucion: 'proceso', evaluacion: 'resultados' };
+  const ALIAS_TAB = { preparacion: 'registro', ejecucion: 'proceso', evaluacion: 'resultados', complementarias: 'proceso', evidencia: 'proceso' };
   const actual = etapaDe(P.estado, E);
   tabActual = ALIAS_TAB[tab] || tab || (actual === 'fin' ? 'cierre' : actual);
   ejecSel = null;
@@ -330,7 +332,7 @@ function pintar() {
   const et = etapasDe(P.tipo);
   const cur = etapaDe(P.estado, E);
   const n = cur === 'fin' ? et.length : et.findIndex(([k]) => k === cur);
-  const tabs = [...et, ['seguimiento', 'Seguimiento', 'messages-square'], ['evidencia', 'Evidencia', 'paperclip']];
+  const tabs = [...et, ['seguimiento', 'Seguimiento', 'messages-square']];
   root.innerHTML = `
     <a class="back-link" href="#/pruebas">${icon('arrow-left')} Pruebas</a>
     <section class="prueba-head card">
@@ -368,9 +370,11 @@ function siguientePaso() {
     ? ['Iniciar la prueba cuando esté lista.', true]
     : definir || [`Esperando a que ${P.registrado_por_nombre || 'quien registró la prueba'} la inicie.`, false];
   const misAreas = AREAS_ORDEN.filter((a) => autoridad(P.tipo, `evaluar_${a}`) || autoridad(P.tipo, `capturar_${a}`));
-  const proceso = definir || [misAreas.length
-    ? 'Registrar y evaluar los parámetros de su área.'
-    : 'Las áreas registran y evalúan sus parámetros.', misAreas.length > 0 || puedeEn(P, 'preparar')];
+  const evaluo = AREAS_ORDEN.some((a) => puedeArea(P, 'evaluar', a));
+  const fin = fechaFinDe(P);
+  const proceso = definir || (puedeEn(P, 'preparar') && fin && fin <= todayISO() ? ['Terminar la prueba (hoy concluye su fecha de ejecución).', true]
+    : evaluo && E.eval_faltantes > 0 ? [`Evaluar ${E.eval_faltantes} parámetro(s) ya registrados (pestaña Resultados).`, true]
+      : [misAreas.length ? 'Registrar los parámetros de su área.' : 'Las áreas registran sus parámetros.', misAreas.length > 0 || puedeEn(P, 'preparar')]);
   const evalua = E.eval_faltantes > 0
     ? [`Evaluar los parámetros de cada área (${E.eval_faltantes} pendientes).`, puedeEn(P, 'evaluar')]
     : [`Veredicto de cada área (${E.recom_faltantes} pendientes).`, puedeEn(P, 'evaluar')];
@@ -390,7 +394,7 @@ function accionesHTML() {
   const e = P.estado, b = [];
   const B = (a, ico, t, cls = 'secondary') => b.push(`<button class="btn ${cls}" data-pa="${a}">${icon(ico)} ${esc(t)}</button>`);
   if (['registrada', 'en_preparacion', 'preparada'].includes(e) && puedeEn(P, 'preparar')) { B('iniciar', 'play', 'Iniciar prueba', 'primary btn-iniciar'); B('editar', 'pencil', 'Editar registro'); }
-  if (e === 'en_ejecucion' && (puedeEn(P, 'preparar') || puedeEn(P, 'ejecutar'))) B('terminar', 'flag', 'Terminar prueba');
+  if (e === 'en_ejecucion' && (puedeEn(P, 'preparar') || puedeEn(P, 'ejecutar'))) B('terminar', 'flag', 'Terminar prueba', 'primary btn-terminar');
   if (e === 'requiere_repeticion' && (puedeEn(P, 'preparar') || autoridad(P.tipo, 'dictaminar'))) B('nueva_ejecucion', 'repeat', 'Iniciar nueva ejecución', 'primary');
   b.push(`<button class="btn secondary" data-pa="imprimir">${icon('printer')} Expediente</button>`);
   if (!CERRADAS.includes(e) && puedeEn(P, 'cancelar')) B('cancelar', 'ban', 'Cancelar prueba', 'ghost danger-text');
@@ -426,8 +430,8 @@ async function cargarTab() {
   const tab = tabActual;
   const ctx = { P, E, ejecucion: ejecSel, refrescar };
   try {
-    const f = { registro: tabRegistro, proceso: etapaProceso, complementarias: etapaComplementarias, resultados: etapaResultados,
-      recomendaciones: etapaRecomendaciones, dictamen: etapaDictamen, cierre: etapaCierre, seguimiento: tabSeguimiento, evidencia: tabEvidencia }[tab] || tabRegistro;
+    const f = { registro: tabRegistro, proceso: etapaProceso, resultados: etapaResultados,
+      recomendaciones: etapaRecomendaciones, dictamen: etapaDictamen, cierre: etapaCierre, seguimiento: tabSeguimiento }[tab] || tabRegistro;
     await f(pane, ctx);
     bindCounters(pane);
   } catch (err) {
@@ -498,7 +502,8 @@ async function tabRegistro(pane) {
     proveedor: P.proveedor_nombre, empaque: P.empaque, proceso: P.proceso, equipo: P.equipo_nombre };
   const dato = (ico, l, v) => `<div class="rg-dato"><span class="rd-ico">${icon(ico)}</span><div><small>${esc(l)}</small><b>${v}</b></div></div>`;
   const hoy = todayISO();
-  const fecha = P.fecha_planeada ? `${fmtDate(P.fecha_planeada)}${P.fecha_planeada === hoy ? ' <em class="rd-hoy">Hoy</em>' : ''}` : '<span class="cell-sub">Sin fecha</span>';
+  const enCurso = P.fecha_planeada && P.fecha_planeada <= hoy && fechaFinDe(P) >= hoy;
+  const fecha = P.fecha_planeada ? `${esc(fechaEjecTxt(P))}${enCurso ? ' <em class="rd-hoy">Hoy</em>' : ''}` : '<span class="cell-sub">Sin fecha</span>';
   pane.innerHTML = `<div class="card rg-ficha">
       <div class="rg-main">
         <div class="rg-top"><span class="pc-folio mono">${esc(P.folio)}</span><span class="rg-tipo">${esc(P.tipo_nombre)}</span>
@@ -536,8 +541,9 @@ async function tabSeguimiento(pane) {
       <div class="field" style="margin:0"><label for="seg-txt" class="sr-only">Nueva nota</label>
         <textarea id="seg-txt" name="texto" maxlength="2000" rows="2" required placeholder="Nota, acuerdo u observación…" data-counter></textarea></div>
       <button class="btn primary" type="submit">${icon('send')} Agregar nota</button></form>
-    ${data.length ? `<ol class="timeline">${data.map((s) => `<li class="tl-${s.tipo}"><span class="tl-ico">${icon(SEG_ICO[s.tipo] || 'dot')}</span>
-      <div class="tl-body"><div class="tl-head">${s.tipo === 'nota' ? avatarHTML(s.usuario, s.foto_url, 'xs') : ''}<b>${esc(s.usuario || 'Sistema')}</b><span>${fmtDateTime(s.created_at)}</span></div><p>${esc(s.texto)}</p></div></li>`).join('')}</ol>`
+    ${data.length ? `<ol class="timeline seg-fotos">${data.map((s) => `<li class="tl-${s.tipo}">
+      <span class="tl-who">${s.usuario ? avatarHTML(s.usuario, s.foto_url, 'sm') : `<span class="tl-ico">${icon('cpu')}</span>`}<span class="tl-badge">${icon(SEG_ICO[s.tipo] || 'dot')}</span></span>
+      <div class="tl-body"><div class="tl-head"><b>${esc(s.usuario || 'Sistema')}</b><span>${fmtDateTime(s.created_at)}</span></div><p>${esc(s.texto)}</p></div></li>`).join('')}</ol>`
       : vacio('Sin seguimiento.')}</div>`;
   refreshIcons();
   pane.querySelector('#seg-form').addEventListener('submit', async (e) => {
@@ -550,34 +556,3 @@ async function tabSeguimiento(pane) {
   });
 }
 
-// ---------- Evidencia ----------
-const ETAPA_TXT = { registro: 'Registro', preparacion: 'Preparación', ejecucion: 'Ejecución', evaluacion: 'Evaluación', dictamen: 'Dictamen', cierre: 'Cierre' };
-async function tabEvidencia(pane) {
-  const { data, error } = await sb.from('adjuntos_prubind')
-    .select('*, subio:usuarios_prubind!adjuntos_prubind_subido_por_fkey(nombre), tipo:tipos_evidencia_prubind(nombre), resultado:resultados_prubind(metodo:metodos_prubind(nombre)), batch:batches_prubind(numero)')
-    .eq('prueba_id', P.id).order('created_at', { ascending: false });
-  if (error) throw error;
-  const cerrada = ['cerrada_aprobada', 'cerrada_rechazada'].includes(P.estado);
-  pane.innerHTML = `<div class="card">${cardHead('Evidencia documental', 'Reportes de laboratorio, fotografías, fichas técnicas, certificados…', btn('data-adj="subir"', 'upload', 'Adjuntar evidencia', 'primary'))}
-    ${data.length ? `<div class="list">${data.map((a) => `<div class="list-item">
-        <span class="file-ico">${icon(/^image\//.test(a.mime || '') ? 'image' : /pdf/.test(a.mime || '') ? 'file-text' : /sheet|excel|csv/.test(a.mime || '') ? 'file-spreadsheet' : 'file')}</span>
-        <div class="li-main"><b>${esc(a.nombre)}</b><span>${esc([a.tipo?.nombre, a.etapa && ETAPA_TXT[a.etapa], a.resultado?.metodo?.nombre && `Resultado: ${a.resultado.metodo.nombre}`, a.batch && `Batch #${a.batch.numero}`, a.descripcion, fmtBytes(a.tamano), a.subio?.nombre, fmtDateTime(a.created_at)].filter(Boolean).join(' · '))}</span></div>
-        <div class="row-actions">${iconBtn(`data-adj="abrir" data-ruta="${esc(a.ruta)}"`, 'external-link', 'Abrir')}
-          ${!cerrada && (state.isAdmin || a.subido_por === state.profile.id) ? iconBtn(`data-adj="eliminar" data-id="${esc(a.id)}" data-ruta="${esc(a.ruta)}"`, 'trash-2', 'Eliminar', 'bad') : ''}</div></div>`).join('')}</div>`
-      : vacio('Sin evidencia adjunta.')}</div>`;
-  refreshIcons();
-  pane.addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-adj]');
-    if (!b) return;
-    try {
-      if (b.dataset.adj === 'subir') { if (await subirEvidencia(P, { etapa: ETAPA_EVIDENCIA[etapaDe(P.estado, E)] })) refrescar('evidencia'); }
-      else if (b.dataset.adj === 'abrir') await abrirAdjunto(b.dataset.ruta);
-      else if (b.dataset.adj === 'eliminar') {
-        if (!await confirmDialog({ title: 'Eliminar evidencia', message: 'El archivo se eliminará definitivamente.', confirmText: 'Eliminar', danger: true })) return;
-        mustRow(await sb.from('adjuntos_prubind').delete().eq('id', b.dataset.id).select('id'));
-        await sb.storage.from('adjuntos_prubind').remove([b.dataset.ruta]).catch(() => {});
-        toast('Evidencia eliminada.', 'success'); refrescar('evidencia');
-      }
-    } catch (err) { toast(errMsg(err), 'error'); }
-  });
-}

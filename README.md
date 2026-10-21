@@ -383,3 +383,14 @@ Migración `20261021002200_prubind_v53_pendientes_hechos.sql`.
 - App instalada: `display: fullscreen` con `display_override` [window-controls-overlay, fullscreen, standalone]. Android abre en pantalla completa; en computadora la barra de título se oculta (solo quedan los botones de ventana sobre el encabezado, que sirve para mover la ventana). iOS no permite ocultar la barra de estado.
 - Barra de color de nuevo en naranja (#F58020).
 - Textos de la app más breves (saludo, pasos siguientes, avisos y ayudas).
+
+## v5.6 · Permisos por puesto, pendientes, evidencia y expediente (21/10/2026)
+- **Permisos:** los parámetros a evaluar los define solo el responsable de cada área (Gerente de Producción, Jefe de Calidad, Jefe de Mantenimiento, Supervisor de SSA), que también es el único que crea parámetros nuevos. Durante la prueba registran: Calidad → inspectores o Jefe; Producción → supervisores o Gerente; Seguridad → Supervisor o Ingeniero de Seguridad; Mantenimiento → Jefe o técnicos (puesto nuevo "Técnico de Mantenimiento"). Se corrigió que el Ingeniero de Seguridad tenía permisos de Calidad.
+- **Sin "Evaluaciones complementarias":** bromatológicos, microbiología y sensorial se registran en *En proceso*, en "Toda la prueba".
+- **Pendiente:** cada valor puede marcarse "Pendiente"; el responsable lo completa al evaluar o lo marca "No se pudo determinar", y quien dictamina puede completarlo y evaluarlo en la pestaña del dictamen.
+- **Evaluar durante el proceso:** los responsables ven "Evaluar" en sus pendientes desde que hay datos, sin esperar a que termine la prueba.
+- **Terminar:** botón destacado para quien registró; la fecha de ejecución puede ser un día o un rango, y la prueba se termina sola al acabar el último día (pg_cron `prubind_autoterminar`, 00:05 hora de México).
+- **Evidencia:** se adjunta en cada parámetro al registrar y en el dictamen (ya no hay pestaña Evidencia aparte).
+- **Seguimiento** con la foto de cada persona; **expediente** con logo, solo las secciones con datos y firmas de quien dictaminó y quien cerró.
+- **Agregar parámetro:** formulario directo (nombre, cuantitativo o cualitativo y unidad); si el nombre ya existe en el catálogo se usa ese. Catálogo depurado (5 parámetros vagos o duplicados desactivados).
+- Migraciones `20261021002300_prubind_v56_roles_pendientes_evidencias.sql` y `20261021002400_prubind_v56_muestras_dictamen.sql`; pruebas `tests/sql/pruebas_flujo_v56.sql` (13/13).

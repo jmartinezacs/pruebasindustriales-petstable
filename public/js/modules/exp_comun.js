@@ -3,7 +3,7 @@
 // =====================================================================
 import {
   sb, state, esc, icon, toast, openModal, checkForm, nullIfEmpty, must, getCat, opciones,
-  ADJ_MAX_MB, ADJ_ACCEPT, rutaAdjunto, avisar,
+  ADJ_MAX_MB, ADJ_ACCEPT, rutaAdjunto, avisar, OPCIONES_TXT,
 } from '../core.js';
 
 export const box = (l, v, full = false) => `<div class="info-box ${full ? 'full' : ''}"><small>${esc(l)}</small><div>${v}</div></div>`;
@@ -58,6 +58,64 @@ export async function subirEvidencia(P, { resultado_id = null, batch_id = null, 
     },
   });
 }
+
+// Sube archivos sin abrir un formulario (evidencia de un parámetro o del dictamen); devuelve cuántos subió
+export async function subirArchivos(P, files, { plan_id = null, batch_id = null, resultado_id = null, etapa = null, descripcion = null } = {}) {
+  let n = 0;
+  for (const file of files) {
+    if (file.size > ADJ_MAX_MB * 1048576) { toast(`${file.name} supera ${ADJ_MAX_MB} MB; no se subió.`, 'warning'); continue; }
+    const ruta = rutaAdjunto(P.id, file.name);
+    const up = await sb.storage.from('adjuntos_prubind').upload(ruta, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+    if (up.error) throw up.error;
+    const ins = await sb.from('adjuntos_prubind').insert({ prueba_id: P.id, nombre: file.name.slice(0, 200), ruta, mime: file.type || null, tamano: file.size,
+      plan_id, batch_id, resultado_id, etapa, descripcion, subido_por: state.profile.id });
+    if (ins.error) { await sb.storage.from('adjuntos_prubind').remove([ruta]).catch(() => {}); throw ins.error; }
+    n += 1;
+  }
+  return n;
+}
+
+// Botón para elegir archivos de evidencia (sin subirlos todavía) y los ya subidos
+export const eviPicker = (name, adjs = []) => `<div class="evi-pick">
+  ${adjs.map((a) => `<button type="button" class="evi-chip" data-ver-adj="${esc(a.ruta)}" title="Abrir ${esc(a.nombre)}">${icon('paperclip')}<span>${esc(a.nombre)}</span></button>`).join('')}
+  <label class="evi-add" title="Adjuntar evidencia">${icon('paperclip')}<span>Evidencia</span><input type="file" name="${esc(name)}" multiple accept="${ADJ_ACCEPT}" hidden></label>
+  <span class="evi-sel"></span></div>`;
+// Lista corta de evidencias (solo lectura)
+export const eviChips = (adjs = []) => (adjs.length ? `<div class="evi-pick">${adjs.map((a) =>
+  `<button type="button" class="evi-chip" data-ver-adj="${esc(a.ruta)}" title="Abrir ${esc(a.nombre)}">${icon('paperclip')}<span>${esc(a.nombre)}</span></button>`).join('')}</div>` : '');
+// Muestra cuántos archivos se eligieron en cada selector
+document.addEventListener('change', (e) => {
+  const inp = e.target.closest('.evi-add input[type=file]');
+  if (!inp) return;
+  const out = inp.closest('.evi-pick')?.querySelector('.evi-sel');
+  if (out) out.textContent = inp.files.length ? `${inp.files.length} archivo(s) por subir` : '';
+});
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-ver-adj]');
+  if (!b) return;
+  e.preventDefault();
+  abrirAdjunto(b.dataset.verAdj).catch((err) => toast(err.message || 'No se pudo abrir el archivo.', 'error'));
+});
+
+// Campo para capturar el valor de un parámetro (numérico, opción, presencia o diluciones)
+export function campoValor(m, name, { valores = [], unidad = '', placeholder = '', disabled = false } = {}) {
+  const dis = disabled ? 'disabled' : '';
+  if (m.tipo_resultado === 'diluciones') {
+    return `<div class="dil-grid">${m.diluciones.map((d, i) => { const r = valores.find((x) => x.dilucion === d);
+      return `<label>${esc(d)} <span class="cell-sub">${esc(unidad || 'UFC/g')}</span><input type="number" step="any" min="0" inputmode="decimal" name="${name}_${i}" value="${esc(r?.valor_num ?? '')}" ${dis}></label>`; }).join('')}</div>`;
+  }
+  const r1 = valores.find((x) => !x.dilucion);
+  if (m.tipo_resultado === 'numerico') {
+    return `<input type="number" step="any" inputmode="decimal" name="${name}" value="${esc(r1?.valor_num ?? '')}" placeholder="${esc(placeholder)}" ${dis}>`;
+  }
+  const ops = m.tipo_resultado === 'presencia' ? ['ausencia', 'presencia'] : ((m.opciones || []).length ? m.opciones.filter((o) => o !== 'pendiente') : ['conforme', 'no_conforme', 'no_aplica']);
+  return `<select name="${name}" data-native ${dis}><option value="">Sin registrar</option>${ops.map((o) => `<option value="${esc(o)}" ${r1?.valor_opcion === o ? 'selected' : ''}>${esc(OPCIONES_TXT[o] || o)}</option>`).join('')}</select>`;
+}
+// Valores escritos en el campo: [{ d: dilución|null, v: texto }]
+export const leerValor = (form, m, name) => (m.tipo_resultado === 'diluciones'
+  ? m.diluciones.map((d, i) => ({ d, v: form.elements[`${name}_${i}`]?.value ?? '' }))
+  : [{ d: null, v: form.elements[name]?.value ?? '' }]);
+export const payloadValor = (m, v) => (m.tipo_resultado === 'numerico' || m.tipo_resultado === 'diluciones' ? { valor_num: Number(v), valor_opcion: null } : { valor_opcion: v, valor_num: null });
 
 export async function abrirAdjunto(ruta) {
   const w = window.open('', '_blank');

@@ -1,66 +1,148 @@
 // =====================================================================
-// Etapa 4 · Resultados por parámetro y etapa 5 · Veredicto y
+// Etapa 3 · Resultados por parámetro y etapa 4 · Veredicto y
 // recomendaciones por área.
-// Cada área es independiente: evalúa lo suyo (✓ Cumple, ✗ No cumple o
-// ? No se pudo determinar) y da su veredicto (satisfactoria / no
-// satisfactoria) en cuanto termina, aunque la prueba siga en proceso.
-// Lo que no tiene resultado (p. ej. bromatológicos de laboratorio) no
+// Cada área es independiente: su responsable (Gerente o Jefe) evalúa lo
+// suyo (✓ Cumple, ✗ No cumple o ? No se pudo determinar) en cuanto se
+// registra, aunque la prueba siga en proceso, y da su veredicto
+// (satisfactoria / no satisfactoria). Lo marcado "Pendiente" aparece para
+// que el responsable lo complete o indique que no se pudo determinar; no
 // detiene la evaluación. La prueba pasa sola al dictamen de Alta Dirección
 // cuando termina y todas las áreas que participaron dieron su veredicto.
 // =====================================================================
 import {
-  sb, state, esc, icon, toast, errMsg, must, mustRow, getCat, unidadTxt, fmtDateTime, pill, puedeArea, misAreas,
+  sb, state, esc, icon, toast, errMsg, must, mustRow, getCat, unidadTxt, fmtDateTime, pill, puedeArea, misAreas, todayISO,
   AREAS, AREAS_ORDEN, COMPLEMENTARIAS, OPCIONES_TXT, EVALUACION, VEREDICTO, refreshIcons,
 } from '../core.js';
-import { aviso, vacio, checklist, accion, criterioTxt } from './exp_comun.js';
+import { aviso, vacio, checklist, accion, criterioTxt, campoValor, leerValor, payloadValor, eviChips } from './exp_comun.js';
 
 const EVALUA = ['en_ejecucion', 'en_evaluacion', 'pendiente_resultados'];
 const TERMINADA = ['en_evaluacion', 'pendiente_resultados'];
+const conValor = (r) => r.valor_num != null || !!r.valor_opcion;
 
 // Consolidado de la ejecución actual: filas a evaluar por área
 export async function consolidarResultados(P, ej = P.ejecucion_actual) {
-  const [metodos, unidades, plan, res, pars, ctrl, ev, rec] = await Promise.all([
+  const [metodos, unidades, plan, res, pars, ctrl, ev, rec, adj] = await Promise.all([
     getCat('metodos'), getCat('unidades'),
     sb.from('plan_evaluacion_prubind').select('*').eq('prueba_id', P.id).eq('incluido', true).order('orden'),
-    sb.from('v_resultados_prubind').select('id, plan_id, valor_num, valor_opcion, dilucion, estado, justificacion, unidad, batch_numero, muestra_nivel, capturado_por_nombre').eq('prueba_id', P.id).eq('ejecucion', ej).order('created_at'),
+    sb.from('v_resultados_prubind').select('id, plan_id, muestra_id, valor_num, valor_opcion, dilucion, estado, justificacion, unidad, batch_numero, muestra_nivel, capturado_por_nombre').eq('prueba_id', P.id).eq('ejecucion', ej).order('created_at'),
     sb.from('prueba_parametros_prubind').select('*').eq('prueba_id', P.id).order('orden'),
     sb.from('ejecucion_controles_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej),
     sb.from('evaluaciones_prubind').select('*, por:usuarios_prubind!evaluaciones_prubind_evaluado_por_fkey(nombre)').eq('prueba_id', P.id).eq('ejecucion', ej),
     sb.from('recomendaciones_prubind').select('*, por:usuarios_prubind!recomendaciones_prubind_emitido_por_fkey(nombre)').eq('prueba_id', P.id).eq('ejecucion', ej),
+    sb.from('adjuntos_prubind').select('id, nombre, ruta, plan_id, batch_id, etapa').eq('prueba_id', P.id).not('plan_id', 'is', null),
   ]);
-  [plan, res, pars, ctrl, ev, rec].forEach((r) => { if (r.error) throw r.error; });
+  [plan, res, pars, ctrl, ev, rec, adj].forEach((r) => { if (r.error) throw r.error; });
   const met = (id) => metodos.find((m) => m.id === id);
   const filas = [];
   plan.data.forEach((pl) => {
     const m = met(pl.metodo_id); if (!m) return;
-    const R = res.data.filter((r) => r.plan_id === pl.id && (r.valor_num != null || r.valor_opcion));
+    const todos = res.data.filter((r) => r.plan_id === pl.id);
+    const R = todos.filter(conValor);
     const valores = R.map((r) => {
       const v = r.valor_opcion ? (OPCIONES_TXT[r.valor_opcion] || r.valor_opcion) : `${r.valor_num}${r.unidad ? ` ${r.unidad}` : ''}`;
       const donde = `${r.batch_numero ? `${P.ejecucion_form === 'fabricacion' ? 'Batch' : 'Corrida'} ${r.batch_numero}` : 'General'}${r.dilucion ? ` · ${r.dilucion}` : ''}`;
       return { txt: `${donde}: ${v}`, fuera: r.estado === 'no_conforme', just: r.justificacion };
     });
-    filas.push({ key: `pl:${pl.id}`, plan_id: pl.id, area: m.area, compl: COMPLEMENTARIAS.includes(m.categoria), lab: m.categoria === 'bromatologia', nombre: m.nombre,
-      criterio: criterioTxt(pl, unidadTxt(unidades, m.unidad_id)), ref: pl.crit_referencia, valores, conValor: R.length > 0,
-      ev: ev.data.find((x) => x.plan_id === pl.id) });
+    filas.push({ key: `pl:${pl.id}`, plan_id: pl.id, m, area: m.area, compl: COMPLEMENTARIAS.includes(m.categoria), nombre: m.nombre,
+      unidad: unidadTxt(unidades, m.unidad_id), criterio: criterioTxt(pl, unidadTxt(unidades, m.unidad_id)), ref: pl.crit_referencia, valores, conValor: R.length > 0,
+      marcas: todos.filter((r) => !conValor(r)), pend: todos.length > 0 && !R.length,
+      adjs: adj.data.filter((a) => a.plan_id === pl.id), ev: ev.data.find((x) => x.plan_id === pl.id) });
   });
   pars.data.forEach((x) => {
     const c = ctrl.data.find((k) => k.prueba_parametro_id === x.id);
-    filas.push({ key: `par:${x.id}`, prueba_parametro_id: x.id, area: 'produccion', compl: false, lab: false, nombre: `${x.nombre} (${P.equipo_nombre || 'equipo'})`,
+    filas.push({ key: `par:${x.id}`, prueba_parametro_id: x.id, area: 'produccion', compl: false, nombre: `${x.nombre} (${P.equipo_nombre || 'equipo'})`,
       criterio: x.minimo != null || x.maximo != null ? criterioTxt({ crit_minimo: x.minimo, crit_maximo: x.maximo }, unidadTxt(unidades, x.unidad_id)) : (x.referencia || '').split(' · ')[0],
       valores: c?.valor != null ? [{ txt: `${c.valor} ${unidadTxt(unidades, x.unidad_id)}`.trim(), fuera: c.resultado === 'no_conforme', just: c.observaciones }] : [],
-      conValor: c?.valor != null, ev: ev.data.find((k) => k.prueba_parametro_id === x.id) });
+      conValor: c?.valor != null, marcas: [], pend: false, adjs: [], ev: ev.data.find((k) => k.prueba_parametro_id === x.id) });
   });
   const areas = AREAS_ORDEN.filter((a) => filas.some((f) => f.area === a));
   // Por evaluar: lo que tiene resultado y aún no se evalúa
   const faltan = (a) => filas.filter((f) => f.area === a && f.conValor && !f.ev).length;
   // Participa el área con algún dato o alguna evaluación
   const participa = (a) => filas.some((f) => f.area === a && (f.conValor || f.ev));
-  return { filas, areas, faltan, participa, REC: rec.data };
+  return { filas, areas, faltan, participa, REC: rec.data, ADJ: adj.data };
 }
 
 // Conteo ✓ ✗ ? de un área
 const conteo = (fs) => Object.keys(EVALUACION).map((k) => [k, fs.filter((f) => f.ev?.evaluacion === k).length]);
-const resumenEval = (fs) => `<span class="ev-sum">${conteo(fs).map(([k, n]) => `<span class="ev-n ${EVALUACION[k][1]}" title="${esc(EVALUACION[k][0])}">${icon(EVALUACION[k][2])} ${n}</span>`).join('')}</span>`;
+export const resumenEval = (fs) => `<span class="ev-sum">${conteo(fs).map(([k, n]) => `<span class="ev-n ${EVALUACION[k][1]}" title="${esc(EVALUACION[k][0])}">${icon(EVALUACION[k][2])} ${n}</span>`).join('')}</span>`;
+
+// ---------- Fila de evaluación (también se usa en el dictamen) ----------
+const nombreValor = (f) => `cv_${f.plan_id}`;
+export function filaEval(f, { edit, completarTodo = false }) {
+  const sel = f.ev?.evaluacion;
+  const obs = f.ev && f.ev.observaciones !== 'Sin observaciones' ? f.ev.observaciones : '';
+  // Completar el valor marcado "Pendiente" (con la prueba terminada, también lo que nadie registró)
+  const completar = edit && !f.conValor && f.m && (f.pend || completarTodo);
+  const valores = f.valores.length ? f.valores.map((v) => `<div class="${v.fuera ? 'bad-txt' : ''}">${esc(v.txt)}${v.fuera ? ` ${icon('alert-triangle')}` : ''}${v.just ? `<div class="cell-sub">${esc(v.just)}</div>` : ''}</div>`).join('')
+    : `${f.pend ? `<span class="lab-pend">${icon('hourglass')} Pendiente</span>` : '<span class="cell-sub">Sin resultado</span>'}
+       ${completar ? `<div class="ev-completar">${campoValor(f.m, nombreValor(f), { unidad: f.unidad, placeholder: f.criterio ? `Valor (${f.criterio})` : 'Valor, si ya lo tiene' })}</div>` : ''}`;
+  const opcion = (k, habil) => {
+    const [l, cls, ic] = EVALUACION[k];
+    return `<label class="ev-opt ${cls} ${habil ? '' : 'off'}" title="${esc(l)}"><input type="radio" name="ev_${esc(f.key)}" value="${k}" ${sel === k ? 'checked' : ''} ${habil ? '' : 'disabled'}>
+      <span class="ev-btn" aria-hidden="true">${icon(ic)}</span><span class="sr-only">${esc(l)}</span></label>`;
+  };
+  const conV = f.conValor || completar;
+  return `<div class="ev-row ${sel ? `is-${sel}` : ''} ${f.pend && !f.conValor ? 'is-pend' : ''}" data-fila="${esc(f.key)}">
+    <div class="ev-param"><b>${esc(f.nombre)}</b>${f.criterio ? `<span>Criterio: ${esc(f.criterio)}${f.ref ? ` · ${esc(f.ref)}` : ''}</span>` : '<span>Sin criterio cargado</span>'}</div>
+    <div class="ev-val">${valores}${eviChips(f.adjs)}</div>
+    <div class="ev-pick">${edit ? `<div class="ev-opts" role="radiogroup" aria-label="Evaluación de ${esc(f.nombre)}">${opcion('cumple', conV)}${opcion('no_cumple', conV)}${opcion('no_determinado', true)}</div>`
+      : sel ? pill(EVALUACION[sel][0], EVALUACION[sel][1]) : `<span class="cell-sub">${f.conValor ? 'Por evaluar' : '—'}</span>`}</div>
+    <div class="ev-obs">${edit ? `<input name="ob_${esc(f.key)}" maxlength="500" value="${esc(obs)}" placeholder="${sel === 'no_cumple' || sel === 'no_determinado' ? 'Explique brevemente *' : 'Observaciones (opcional)'}" aria-label="Observaciones de ${esc(f.nombre)}">`
+      : f.ev ? `${esc(f.ev.observaciones)}<div class="cell-sub">${esc(f.ev.por?.nombre || '')} · ${fmtDateTime(f.ev.updated_at)}</div>` : ''}</div>
+  </div>`;
+}
+export const listaEval = (fs, opts) => `<div class="ev-list"><div class="ev-row ev-headrow" aria-hidden="true"><div>Parámetro</div><div>Resultado</div><div>Evaluación</div><div>Observaciones</div></div>${fs.map((f) => filaEval(f, opts)).join('')}</div>`;
+
+// Al elegir ✗ o ?, la observación pasa a ser obligatoria
+export function enlazarEval(cont) {
+  cont.addEventListener('change', (e) => {
+    const r = e.target.closest('.ev-opt input'); if (!r) return;
+    const row = r.closest('.ev-row'); row.classList.remove('is-cumple', 'is-no_cumple', 'is-no_determinado'); row.classList.add(`is-${r.value}`);
+    const ob = row.querySelector('.ev-obs input');
+    if (ob) { ob.placeholder = r.value === 'cumple' ? 'Observaciones (opcional)' : 'Explique brevemente *'; if (r.value !== 'cumple' && !ob.value) ob.focus(); }
+  });
+}
+
+// Guarda un valor capturado al evaluar o dictaminar (completa el "Pendiente" o va al registro general)
+async function guardarValor(P, f, entradas, justificacion) {
+  const ej = P.ejecucion_actual;
+  let muestraId = f.marcas[0]?.muestra_id;
+  if (!muestraId) {
+    const { data } = must(await sb.from('muestras_prubind').select('id').eq('prueba_id', P.id).eq('ejecucion', ej).eq('nivel', 'corrida').limit(1));
+    muestraId = data[0]?.id || must(await sb.from('muestras_prubind').insert({ prueba_id: P.id, nivel: 'corrida', codigo: '', fecha_muestreo: todayISO() }).select('id').single()).data.id;
+  }
+  for (const { d, v } of entradas) {
+    const marca = f.marcas.find((r) => r.muestra_id === muestraId && (r.dilucion || null) === d);
+    const payload = { ...payloadValor(f.m, v), justificacion: justificacion || null };
+    if (marca) mustRow(await sb.from('resultados_prubind').update(payload).eq('id', marca.id).select('id'));
+    else must(await sb.from('resultados_prubind').insert({ ...payload, prueba_id: P.id, muestra_id: muestraId, plan_id: f.plan_id, metodo_id: f.m.id, dilucion: d, capturado_por: state.profile.id }));
+  }
+}
+
+// Lee la evaluación (y los valores completados) de las filas y la guarda; devuelve cuántos cambios hubo
+export async function guardarEvaluacion(P, form, filas) {
+  const plan = [];
+  for (const f of filas) {
+    const evv = form.querySelector(`input[name="ev_${CSS.escape(f.key)}"]:checked`)?.value;
+    const obsIn = form.elements[`ob_${f.key}`]; const obs = obsIn?.value.trim() || '';
+    const entradas = !f.conValor && f.m ? leerValor(form, f.m, nombreValor(f)).filter((x) => x.v !== '') : [];
+    if (!evv && !entradas.length) continue;
+    if (evv && evv !== 'cumple' && !obs) { obsIn?.focus(); throw new Error(`Explique por qué "${f.nombre}" ${evv === 'no_cumple' ? 'no cumple' : 'no se pudo determinar'}.`); }
+    if (evv && evv !== 'no_determinado' && !f.conValor && !entradas.length) throw new Error(`Escriba el valor de "${f.nombre}" o márquelo como "No se pudo determinar".`);
+    plan.push({ f, evv, obs, entradas });
+  }
+  if (!plan.length) throw new Error('Marque ✓, ✗ o ? en los parámetros que va a evaluar.');
+  for (const { f, evv, obs, entradas } of plan) {
+    // Un valor nuevo borra la evaluación previa del parámetro (servidor): se vuelve a registrar
+    if (entradas.length) await guardarValor(P, f, entradas, evv === 'no_cumple' ? obs : null);
+    if (!evv) continue;
+    const payload = { evaluacion: evv, observaciones: obs || 'Sin observaciones' };
+    if (f.ev && !entradas.length) { if (f.ev.evaluacion !== evv || f.ev.observaciones !== payload.observaciones) mustRow(await sb.from('evaluaciones_prubind').update(payload).eq('id', f.ev.id).select('id')); }
+    else must(await sb.from('evaluaciones_prubind').insert({ ...payload, prueba_id: P.id, area: f.area, plan_id: f.plan_id || null, prueba_parametro_id: f.prueba_parametro_id || null, evaluado_por: state.profile.id }));
+  }
+  return plan.length;
+}
 
 // ============================== RESULTADOS ==============================
 export async function etapaResultados(pane, ctx) {
@@ -71,61 +153,36 @@ export async function etapaResultados(pane, ctx) {
   const antes = ['registrada', 'en_preparacion', 'preparada'].includes(P.estado);
   const vis = misAreas(P);   // áreas propias abiertas y primero; las demás contraídas (se abren al tocarlas)
 
-  const valoresHTML = (f) => (f.valores.length ? f.valores.map((v) => `<div class="${v.fuera ? 'bad-txt' : ''}">${esc(v.txt)}${v.fuera ? ` ${icon('alert-triangle')}` : ''}${v.just ? `<div class="cell-sub">${esc(v.just)}</div>` : ''}</div>`).join('')
-    : f.lab ? `<span class="lab-pend">${icon('hourglass')} Pendiente de laboratorio</span>` : '<span class="cell-sub">Sin resultado</span>');
-  const opcion = (f, k, habil) => {
-    const [l, cls, ic] = EVALUACION[k];
-    return `<label class="ev-opt ${cls} ${habil ? '' : 'off'}" title="${esc(l)}"><input type="radio" name="ev_${esc(f.key)}" value="${k}" ${f.ev?.evaluacion === k ? 'checked' : ''} ${habil ? '' : 'disabled'}>
-      <span class="ev-btn" aria-hidden="true">${icon(ic)}</span><span class="sr-only">${esc(l)}</span></label>`;
-  };
-  const fila = (f) => {
-    const edit = puedeEv(f.area);
-    const sel = f.ev?.evaluacion;
-    const obs = f.ev && f.ev.observaciones !== 'Sin observaciones' ? f.ev.observaciones : '';
-    return `<div class="ev-row ${sel ? `is-${sel}` : ''}" data-fila="${esc(f.key)}">
-      <div class="ev-param"><b>${esc(f.nombre)}</b>${f.criterio ? `<span>Criterio: ${esc(f.criterio)}${f.ref ? ` · ${esc(f.ref)}` : ''}</span>` : '<span>Sin criterio cargado</span>'}</div>
-      <div class="ev-val">${valoresHTML(f)}</div>
-      <div class="ev-pick">${edit ? `<div class="ev-opts" role="radiogroup" aria-label="Evaluación de ${esc(f.nombre)}">${opcion(f, 'cumple', f.conValor)}${opcion(f, 'no_cumple', f.conValor)}${opcion(f, 'no_determinado', true)}</div>`
-        : sel ? pill(EVALUACION[sel][0], EVALUACION[sel][1]) : `<span class="cell-sub">${f.conValor ? 'Por evaluar' : '—'}</span>`}</div>
-      <div class="ev-obs">${edit ? `<input name="ob_${esc(f.key)}" maxlength="500" value="${esc(obs)}" placeholder="${sel === 'no_cumple' || sel === 'no_determinado' ? 'Explique brevemente *' : 'Observaciones (opcional)'}" aria-label="Observaciones de ${esc(f.nombre)}">`
-        : f.ev ? `${esc(f.ev.observaciones)}<div class="cell-sub">${esc(f.ev.por?.nombre || '')} · ${fmtDateTime(f.ev.updated_at)}</div>` : ''}</div>
-    </div>`;
-  };
-  const lista = (fs) => `<div class="ev-list"><div class="ev-row ev-headrow" aria-hidden="true"><div>Parámetro</div><div>Resultado</div><div>Evaluación</div><div>Observaciones</div></div>${fs.map(fila).join('')}</div>`;
-
   pane.innerHTML = `${antes ? aviso('Se evalúa cuando la prueba ya inició.', '', 'circle-play') : ''}
-    ${P.estado === 'en_ejecucion' ? aviso('Puede evaluar lo que su área ya registró.', 'info', 'zap') : ''}
-    <div class="ev-legend">${Object.values(EVALUACION).map(([l, cls, ic]) => `<span class="ev-n ${cls}">${icon(ic)} ${esc(l)}</span>`).join('')}</div>
+    ${P.estado === 'en_ejecucion' ? aviso('Puede evaluar lo que su área ya registró, sin esperar a que termine la prueba.', 'info', 'zap') : ''}
+    <div class="ev-legend">${Object.values(EVALUACION).map(([l, cls, ic]) => `<span class="ev-n ${cls}">${icon(ic)} ${esc(l)}</span>`).join('')}<span class="ev-n warn">${icon('hourglass')} Pendiente: complételo o márquelo con ?</span></div>
     ${K.areas.length ? '' : `<div class="card">${vacio('La prueba no tiene parámetros a evaluar.')}</div>`}
     ${[...K.areas].sort((x, y) => Number(!vis.includes(x)) - Number(!vis.includes(y))).map((a) => {
       const fs = K.filas.filter((f) => f.area === a); const proc = fs.filter((f) => !f.compl), compl = fs.filter((f) => f.compl);
       const conDato = fs.filter((f) => f.conValor).length; const evaluados = fs.filter((f) => f.ev).length; const falta = K.faltan(a);
+      const pend = fs.filter((f) => f.pend && !f.ev).length;
       const sinDatos = !K.participa(a);
+      const edit = puedeEv(a); const completarTodo = P.estado !== 'en_ejecucion';
       return `<form class="card mt area-eval plegable g-${a} ${vis.includes(a) ? '' : 'colapsada'}" data-area="${a}" novalidate>
         <div class="card-head"><div class="ae-title"><span class="ar-ico">${icon(AREAS[a].ico)}</span><div><h3>${esc(AREAS[a].label)}</h3>
-          <p>${sinDatos ? 'Aún sin datos registrados' : `${evaluados} evaluado(s) · ${conDato} con resultado${falta ? ` · <b>${falta} por evaluar</b>` : ''}`}</p></div></div>
-          <div class="head-btns">${resumenEval(fs)}${puedeEv(a) && fs.some((f) => f.conValor && !f.ev) ? `<button type="button" class="btn ghost sm" data-re="todo-cumple">${icon('check-check')} Pendientes como Cumple</button>` : ''}<span class="pleg-ico">${icon('chevron-down')}</span></div></div>
-        ${proc.length ? lista(proc) : ''}
-        ${compl.length ? `<div class="section-title">${icon('microscope')} Evaluaciones complementarias</div>${lista(compl)}` : ''}
-        ${puedeEv(a) ? `<div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn primary">${icon('save')} Guardar evaluación de ${esc(AREAS[a].label)}</button></div>`
+          <p>${sinDatos && !pend ? 'Aún sin datos registrados' : `${evaluados} evaluado(s) · ${conDato} con resultado${falta ? ` · <b>${falta} por evaluar</b>` : ''}${pend ? ` · <b class="warn-txt">${pend} pendiente(s)</b>` : ''}`}</p></div></div>
+          <div class="head-btns">${resumenEval(fs)}${edit && fs.some((f) => f.conValor && !f.ev) ? `<button type="button" class="btn ghost sm" data-re="todo-cumple">${icon('check-check')} Marcar el resto como Cumple</button>` : ''}<span class="pleg-ico">${icon('chevron-down')}</span></div></div>
+        ${proc.length ? listaEval(proc, { edit, completarTodo }) : ''}
+        ${compl.length ? `<div class="section-title">${icon('microscope')} Laboratorio y sensorial</div>${listaEval(compl, { edit, completarTodo })}` : ''}
+        ${edit ? `<div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn primary">${icon('save')} Guardar evaluación de ${esc(AREAS[a].label)}</button></div>`
           : enEval && falta ? aviso(`Lo evalúa el responsable de ${esc(AREAS[a].label)}.`) : ''}
       </form>`;
     }).join('')}`;
   refreshIcons();
 
-  // Al elegir ✗ o ?, la observación pasa a ser obligatoria
-  pane.addEventListener('change', (e) => {
-    const r = e.target.closest('.ev-opt input'); if (!r) return;
-    const row = r.closest('.ev-row'); row.className = `ev-row is-${r.value}`;
-    const ob = row.querySelector('.ev-obs input');
-    if (ob) { ob.placeholder = r.value === 'cumple' ? 'Observaciones (opcional)' : 'Explique brevemente *'; if (r.value !== 'cumple' && !ob.value) ob.focus(); }
-  });
+  enlazarEval(pane);
   pane.addEventListener('click', (e) => {
     const b = e.target.closest('[data-re="todo-cumple"]');
     if (!b) return;
     b.closest('form').querySelectorAll('.ev-row[data-fila]').forEach((row) => {
       const radios = row.querySelectorAll('input[type=radio]:not([disabled])');
-      if (radios.length && ![...radios].some((r) => r.checked) && radios[0].value === 'cumple') { radios[0].checked = true; row.className = 'ev-row is-cumple'; }
+      const f = K.filas.find((x) => x.key === row.dataset.fila);
+      if (f?.conValor && radios.length && ![...radios].some((r) => r.checked) && radios[0].value === 'cumple') { radios[0].checked = true; row.classList.add('is-cumple'); }
     });
   });
   pane.addEventListener('submit', async (e) => {
@@ -133,26 +190,12 @@ export async function etapaResultados(pane, ctx) {
     const form = e.target; const area = form.dataset.area; const err = form.querySelector('.form-error');
     const btnG = form.querySelector('button[type=submit]');
     err.textContent = '';
-    const cambios = [];
-    for (const f of K.filas.filter((x) => x.area === area)) {
-      const evv = form.querySelector(`input[name="ev_${CSS.escape(f.key)}"]:checked`)?.value;
-      if (!evv) continue;
-      const obsIn = form.elements[`ob_${f.key}`]; const obs = obsIn?.value.trim() || '';
-      if (evv !== 'cumple' && !obs) { err.textContent = `Explique por qué "${f.nombre}" ${evv === 'no_cumple' ? 'no cumple' : 'no se pudo determinar'}.`; obsIn?.focus(); return; }
-      const payload = { evaluacion: evv, observaciones: obs || 'Sin observaciones' };
-      if (f.ev) { if (f.ev.evaluacion !== evv || f.ev.observaciones !== payload.observaciones) cambios.push(['upd', f.ev.id, payload]); }
-      else cambios.push(['ins', null, { ...payload, prueba_id: P.id, area, plan_id: f.plan_id || null, prueba_parametro_id: f.prueba_parametro_id || null, evaluado_por: state.profile.id }]);
-    }
-    if (!cambios.length) { err.textContent = 'Marque ✓, ✗ o ? en los parámetros que va a evaluar.'; return; }
     btnG.disabled = true;
     try {
-      for (const [t, id, payload] of cambios) {
-        if (t === 'upd') mustRow(await sb.from('evaluaciones_prubind').update(payload).eq('id', id).select('id'));
-        else must(await sb.from('evaluaciones_prubind').insert(payload));
-      }
+      await guardarEvaluacion(P, form, K.filas.filter((x) => x.area === area));
       toast(`Evaluación de ${AREAS[area].label} guardada.`, 'success');
       const K2 = await consolidarResultados(P);
-      ctx.refrescar(K2.faltan(area) === 0 ? 'recomendaciones' : 'resultados');
+      ctx.refrescar(K2.faltan(area) === 0 && P.estado !== 'en_ejecucion' ? 'recomendaciones' : 'resultados');
     } catch (ex) { err.textContent = errMsg(ex); btnG.disabled = false; }
   });
 }

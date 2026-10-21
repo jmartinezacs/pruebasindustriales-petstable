@@ -874,3 +874,53 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
 .top { padding-top: env(safe-area-inset-top, 0px); }
 @media (max-width: 760px) { .update-bar { top: calc(var(--header-h, 64px) + 8px); } }
 .fs-btn { padding: 0; width: 40px; }
+
+/* v5.6 · Pendientes, evidencia por parámetro, terminar prueba, rango de fechas y seguimiento con foto */
+.cap-tools { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.cap-item.is-pend { border-color: var(--warn-line); background: var(--warn-bg); }
+.cap-item.is-pend .cap-in { opacity: .55; }
+.pend-tg { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--card); color: var(--muted); font-size: 12px; font-weight: 800; cursor: pointer; user-select: none; }
+.pend-tg input { position: absolute; opacity: 0; pointer-events: none; }
+.pend-tg svg { width: 14px; height: 14px; }
+.pend-tg:has(input:checked) { border-color: var(--warn); background: var(--warn); color: #fff; }
+.pend-tg:has(input:focus-visible) { outline: 2px solid var(--turq); outline-offset: 2px; }
+.evi-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.evi-chip, .evi-add { display: inline-flex; align-items: center; gap: 5px; max-width: 220px; height: 30px; padding: 0 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 12px; font-weight: 700; cursor: pointer; }
+.evi-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evi-chip svg, .evi-add svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--turq-strong); }
+.evi-chip:hover, .evi-add:hover { border-color: var(--turq); }
+.evi-add { border-style: dashed; color: var(--muted); }
+.evi-sel { font-size: 11.5px; color: var(--turq-strong); font-weight: 800; }
+.ev-val .evi-pick { margin-top: 4px; }
+.ev-row.is-pend:not(.is-cumple):not(.is-no_cumple):not(.is-no_determinado) { border-color: var(--warn-line); }
+.ev-completar { margin-top: 6px; }
+.ev-completar input, .ev-completar select { width: 100%; min-height: 36px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--input-line, var(--line));
+  background: var(--input, var(--card)); color: var(--text); font: inherit; font-weight: 600; }
+.ev-completar .dil-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 6px; font-size: 11.5px; }
+.dict-pend .ev-list { margin-top: 4px; }
+.eval-cta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.eval-cta > span { flex: 1 1 220px; }
+.fin-card { border: 1.5px solid var(--orange); background: linear-gradient(180deg, var(--orange-soft), var(--card) 70%); }
+.fin-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+.fin-head > div b { display: block; font-size: 15px; }
+.fin-head > div span { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.fin-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--orange); color: #fff; flex: 0 0 auto; }
+.fin-ico svg { width: 20px; height: 20px; }
+.fin-card .link-btn { margin-top: 6px; }
+.btn-terminar { box-shadow: 0 6px 18px rgba(245, 128, 32, .35); }
+.date-range-in { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.date-range-in input { flex: 1 1 150px; min-width: 0; }
+.date-range-in > span { color: var(--muted); font-weight: 700; }
+.date-range-in .hint { flex: 1 1 100%; margin: 0; }
+.seg-fotos::before { left: 21px; }
+.seg-fotos li { gap: 12px; }
+.tl-who { position: relative; z-index: 1; flex: 0 0 auto; width: 44px; height: 44px; display: grid; place-items: center; }
+.tl-who .avatar { width: 40px; height: 40px; box-shadow: 0 0 0 3px var(--card); }
+.tl-who .tl-ico { width: 40px; height: 40px; }
+.tl-badge { position: absolute; right: -2px; bottom: -2px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--card); border: 1.5px solid var(--line); color: var(--muted); }
+.tl-badge svg { width: 11px; height: 11px; }
+.tl-estado .tl-badge { border-color: var(--orange); color: var(--orange); }
+.tl-nota .tl-badge { border-color: var(--turq); color: var(--turq-strong); }
