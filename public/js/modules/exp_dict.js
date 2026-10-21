@@ -172,7 +172,7 @@ function imprimir(P, K, E) {
     <style>body{font:12px/1.45 Segoe UI,Arial,sans-serif;color:#111;margin:24px}h1{font-size:18px;margin:0 0 4px}h2{font-size:14px;border-bottom:2px solid #F58020;padding-bottom:3px;margin:18px 0 8px}
     table{width:100%;border-collapse:collapse;margin:4px 0}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;vertical-align:top}th{background:#f4f4f4;width:28%}
     .t th{width:auto}.muted{color:#666}@media print{button{display:none}}</style></head><body>
-    <h1>Pruebas industriales · ${esc(P.folio)}</h1><div class="muted">Pet's Table S.A. de C.V. · Calidad de producto · Generado ${esc(fmtDateTime(new Date().toISOString()))}</div>
+    <h1>Pruebas industriales · ${esc(P.folio)}</h1><div class="muted">Pet's Table S.A. de C.V. · Calidad de proceso · Generado ${esc(fmtDateTime(new Date().toISOString()))}</div>
     <h2>1. Registro</h2><table>${fila('Folio / tipo', esc(`${P.folio} · ${P.tipo_nombre}`))}${fila('Nombre de la prueba', esc(P.cambio))}${fila('Objetivo', esc(P.objetivo_desc || P.objetivo_nombre || ''))}
       ${fila('Involucrado', esc([P.receta_nombre || P.producto_nombre, P.materia_prima_nombre, P.proveedor_nombre, P.equipo_nombre, P.empaque, P.proceso].filter(Boolean).join(' · ')))}
       ${fila('Fecha de ejecución / batches / cantidad', esc(`${P.fecha_planeada || '—'} · ${P.batches_planeados ?? '—'} · ${P.cantidad_evaluar ? `${P.cantidad_evaluar} ${P.cantidad_unidad || ''}` : '—'}`))}

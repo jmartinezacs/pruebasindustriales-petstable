@@ -51,7 +51,7 @@ async function renderLista(params) {
       <div class="toolbar">
         <div class="search">${icon('search')}<input type="search" id="pl-q" placeholder="Folio, cambio, receta, materia prima o equipo" aria-label="Buscar"></div>
         <select id="pl-tipo" aria-label="Tipo"><option value="">Todos los tipos</option>${tipos.map((t) => `<option value="${esc(t.codigo)}">${esc(t.nombre)}</option>`).join('')}</select>
-        <select id="pl-estado" aria-label="Estado"><option value="abiertas">Abiertas</option><option value="">Todos los estados</option>
+        <select id="pl-estado" aria-label="Estado"><option value="abiertas">Abiertas</option><option value="cerradas">Cerradas</option><option value="">Todos los estados</option>
           ${Object.entries(ESTADOS_PRUEBA).filter(([k]) => !['en_preparacion', 'preparada'].includes(k)).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('')}</select>
         <select id="pl-resp" aria-label="Responsable"><option value="">Cualquier responsable</option><option value="yo">Yo</option>${usuarios.map((u) => `<option value="${esc(u.id)}">${esc(u.nombre)}</option>`).join('')}</select>
         <select id="pl-prio" aria-label="Prioridad"><option value="">Cualquier prioridad</option>${Object.entries(PRIORIDADES).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select>
@@ -68,7 +68,9 @@ async function renderLista(params) {
     const s = sanitizeSearch(f.q);
     if (s) q = q.or(`folio.ilike.*${s}*,cambio.ilike.*${s}*,receta_nombre.ilike.*${s}*,materia_prima_nombre.ilike.*${s}*,equipo_nombre.ilike.*${s}*,empaque.ilike.*${s}*`);
     if (f.tipo) q = q.eq('tipo', f.tipo);
-    if (f.estado === 'abiertas') q = q.in('estado', ABIERTAS); else if (f.estado) q = q.eq('estado', f.estado);
+    if (f.estado === 'abiertas') q = q.in('estado', ABIERTAS);
+    else if (f.estado === 'cerradas') q = q.in('estado', ['cerrada_aprobada', 'cerrada_rechazada']);
+    else if (f.estado) q = q.eq('estado', f.estado);
     const r = f.resp === 'yo' ? state.profile.id : f.resp;
     if (r) q = q.or(`registrado_por.eq.${r},responsable_inicial_id.eq.${r},responsable_ejecucion_id.eq.${r}`);
     if (f.prio) q = q.eq('prioridad', f.prio);

@@ -65,7 +65,12 @@ $configJs = (Read-Text('js/config.js')).Trim()
 $m = Get-Content (Join-Path $Src 'manifest.webmanifest') -Raw -Encoding UTF8 | ConvertFrom-Json
 $m.icons = @(
   [ordered]@{ src = '/apple-touch-icon.png?v=4'; sizes = '512x512'; type = 'image/png'; purpose = 'any' },
-  [ordered]@{ src = '/notif-icon.png?v=4'; sizes = '192x192'; type = 'image/png'; purpose = 'any' }
+  [ordered]@{ src = '/notif-icon.png?v=4'; sizes = '192x192'; type = 'image/png'; purpose = 'any' },
+  # Tamaños exactos que usa Windows para el acceso directo de la app instalada
+  [ordered]@{ src = '/icon-256.png?v=4'; sizes = '256x256'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/icon-144.png?v=4'; sizes = '144x144'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/icon-96.png?v=4'; sizes = '96x96'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/icon-48.png?v=4'; sizes = '48x48'; type = 'image/png'; purpose = 'any' }
 )
 $manifestJson = $m | ConvertTo-Json -Depth 5
 
@@ -106,6 +111,7 @@ Copy-Item (Join-Path $Src 'sw.js') (Join-Path $Out 'sw.js') -Force
 # Insignia monocromática (barra de estado de Android) e ícono grande de respaldo
 Copy-Item (Join-Path $Src 'img/notif-badge.png') (Join-Path $Out 'notif-badge.png') -Force
 Copy-Item (Join-Path $Src 'img/notif-icon.png') (Join-Path $Out 'notif-icon.png') -Force
+foreach ($s in 48, 96, 144, 256) { Copy-Item (Join-Path $Src "icons/icon-$s.png") (Join-Path $Out "icon-$s.png") -Force }
 if ($configJs -notmatch 'APP_VERSION:\s*"([^"]+)"') { throw 'No se encontró APP_VERSION en config.js' }
 [IO.File]::WriteAllText((Join-Path $Out 'version.json'), "{`"version`":`"$($Matches[1])`"}`n", $utf8)
 Get-Item (@('index.html', 'apple-touch-icon.png', 'sw.js', 'manifest.webmanifest', 'version.json', 'notif-badge.png', 'notif-icon.png') | ForEach-Object { Join-Path $Out $_ }) | ForEach-Object { '{0,-24} {1,10:N0} bytes' -f $_.Name, $_.Length }

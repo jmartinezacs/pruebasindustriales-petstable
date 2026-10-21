@@ -29,7 +29,7 @@
       ]
     },
     {
-      "source": "/(apple-touch-icon.png|icon-512.png|notif-badge.png|notif-icon.png)",
+      "source": "/(apple-touch-icon.png|icon-48.png|icon-96.png|icon-144.png|icon-256.png|notif-badge.png|notif-icon.png)",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
     }
   ]

@@ -9,7 +9,7 @@
 // cuando termina y todas las áreas que participaron dieron su veredicto.
 // =====================================================================
 import {
-  sb, state, esc, icon, toast, errMsg, must, mustRow, getCat, unidadTxt, fmtDateTime, pill, puedeArea,
+  sb, state, esc, icon, toast, errMsg, must, mustRow, getCat, unidadTxt, fmtDateTime, pill, puedeArea, misAreas,
   AREAS, AREAS_ORDEN, COMPLEMENTARIAS, OPCIONES_TXT, EVALUACION, VEREDICTO, refreshIcons,
 } from '../core.js';
 import { aviso, vacio, checklist, accion, criterioTxt } from './exp_comun.js';
@@ -69,6 +69,7 @@ export async function etapaResultados(pane, ctx) {
   const enEval = EVALUA.includes(P.estado);
   const puedeEv = (a) => enEval && puedeArea(P, 'evaluar', a);
   const antes = ['registrada', 'en_preparacion', 'preparada'].includes(P.estado);
+  const vis = misAreas(P);   // áreas propias abiertas y primero; las demás contraídas (se abren al tocarlas)
 
   const valoresHTML = (f) => (f.valores.length ? f.valores.map((v) => `<div class="${v.fuera ? 'bad-txt' : ''}">${esc(v.txt)}${v.fuera ? ` ${icon('alert-triangle')}` : ''}${v.just ? `<div class="cell-sub">${esc(v.just)}</div>` : ''}</div>`).join('')
     : f.lab ? `<span class="lab-pend">${icon('hourglass')} Pendiente de laboratorio</span>` : '<span class="cell-sub">Sin resultado</span>');
@@ -96,14 +97,14 @@ export async function etapaResultados(pane, ctx) {
     ${P.estado === 'en_ejecucion' ? aviso('La prueba sigue en proceso. Cada área puede evaluar lo que ya registró sin esperar a las demás.', 'info', 'zap') : ''}
     <div class="ev-legend">${Object.values(EVALUACION).map(([l, cls, ic]) => `<span class="ev-n ${cls}">${icon(ic)} ${esc(l)}</span>`).join('')}</div>
     ${K.areas.length ? '' : `<div class="card">${vacio('La prueba no tiene parámetros a evaluar.')}</div>`}
-    ${K.areas.map((a) => {
+    ${[...K.areas].sort((x, y) => Number(!vis.includes(x)) - Number(!vis.includes(y))).map((a) => {
       const fs = K.filas.filter((f) => f.area === a); const proc = fs.filter((f) => !f.compl), compl = fs.filter((f) => f.compl);
       const conDato = fs.filter((f) => f.conValor).length; const evaluados = fs.filter((f) => f.ev).length; const falta = K.faltan(a);
       const sinDatos = !K.participa(a);
-      return `<form class="card mt area-eval g-${a}" data-area="${a}" novalidate>
+      return `<form class="card mt area-eval plegable g-${a} ${vis.includes(a) ? '' : 'colapsada'}" data-area="${a}" novalidate>
         <div class="card-head"><div class="ae-title"><span class="ar-ico">${icon(AREAS[a].ico)}</span><div><h3>${esc(AREAS[a].label)}</h3>
           <p>${sinDatos ? 'Aún sin datos registrados' : `${evaluados} evaluado(s) · ${conDato} con resultado${falta ? ` · <b>${falta} por evaluar</b>` : ''}`}</p></div></div>
-          <div class="head-btns">${resumenEval(fs)}${puedeEv(a) && fs.some((f) => f.conValor && !f.ev) ? `<button type="button" class="btn ghost sm" data-re="todo-cumple">${icon('check-check')} Pendientes como Cumple</button>` : ''}</div></div>
+          <div class="head-btns">${resumenEval(fs)}${puedeEv(a) && fs.some((f) => f.conValor && !f.ev) ? `<button type="button" class="btn ghost sm" data-re="todo-cumple">${icon('check-check')} Pendientes como Cumple</button>` : ''}<span class="pleg-ico">${icon('chevron-down')}</span></div></div>
         ${proc.length ? lista(proc) : ''}
         ${compl.length ? `<div class="section-title">${icon('microscope')} Evaluaciones complementarias</div>${lista(compl)}` : ''}
         ${puedeEv(a) ? `<div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn primary">${icon('save')} Guardar evaluación de ${esc(AREAS[a].label)}</button></div>`
@@ -165,6 +166,7 @@ export async function etapaRecomendaciones(pane, ctx) {
   const noPart = AREAS_ORDEN.filter((a) => !part.includes(a));
   const listo = (a) => K.faltan(a) === 0 && K.REC.some((r) => r.area === a);
   const completo = part.length > 0 && part.every(listo);
+  const vis = misAreas(P);   // áreas propias abiertas y primero; las demás contraídas
 
   const tarjeta = (a) => {
     const r = K.REC.find((x) => x.area === a); const falta = K.faltan(a);
@@ -188,13 +190,13 @@ export async function etapaRecomendaciones(pane, ctx) {
     } else if (falta) {
       cuerpo = aviso(`Primero se evalúan los resultados del área (${falta} por evaluar).`, '', 'list-checks');
     } else cuerpo = vacio(`Pendiente: lo registra el responsable de ${AREAS[a].label}.`);
-    return `<div class="card mt g-${a}"><div class="card-head"><div class="ae-title"><span class="ar-ico">${icon(AREAS[a].ico)}</span><div><h3>${esc(AREAS[a].label)}</h3><p>${esc(AREAS[a].desc)}</p></div></div>
-      ${r ? pill(VEREDICTO[r.sentido][0], VEREDICTO[r.sentido][1]) : pill('Pendiente', 'warn')}</div>${resumen}${cuerpo}</div>`;
+    return `<div class="card mt plegable g-${a} ${vis.includes(a) ? '' : 'colapsada'}"><div class="card-head"><div class="ae-title"><span class="ar-ico">${icon(AREAS[a].ico)}</span><div><h3>${esc(AREAS[a].label)}</h3><p>${esc(AREAS[a].desc)}</p></div></div>
+      <div class="head-btns">${r ? pill(VEREDICTO[r.sentido][0], VEREDICTO[r.sentido][1]) : pill('Pendiente', 'warn')}<span class="pleg-ico">${icon('chevron-down')}</span></div></div>${resumen}${cuerpo}</div>`;
   };
 
   pane.innerHTML = `${['registrada', 'en_preparacion', 'preparada'].includes(P.estado) ? aviso('El veredicto de cada área se registra cuando el área ya evaluó sus resultados.', '', 'circle-play') : ''}
     <div class="grid grid-main">
-      <div>${part.map(tarjeta).join('') || `<div class="card">${vacio('Ninguna área ha registrado datos todavía.')}</div>`}
+      <div>${[...part].sort((x, y) => Number(!vis.includes(x)) - Number(!vis.includes(y))).map(tarjeta).join('') || `<div class="card">${vacio('Ninguna área ha registrado datos todavía.')}</div>`}
         ${noPart.length ? `<div class="card mt no-part"><div class="card-head"><div>${P.estado === 'en_ejecucion' ? '<h3>Áreas sin datos todavía</h3><p>Participan si registran algún dato durante la prueba.</p>'
           : '<h3>Áreas que no participaron</h3><p>No registraron datos en la prueba: se considera que no requirieron participar.</p>'}</div></div>
           <div class="chips">${noPart.map((a) => `<span class="chip">${icon(AREAS[a].ico)} ${esc(AREAS[a].label)}</span>`).join('')}</div></div>` : ''}</div>

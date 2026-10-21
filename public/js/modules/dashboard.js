@@ -33,6 +33,8 @@ function periodRange(p, desde, hasta) {
 }
 
 let filtroPend = 'todas', verTodas = false, PEND = [];
+// Si en la campana se marca algo como hecho, el panel se actualiza
+document.addEventListener('prubind:pendientes', () => { if (root) load(); });
 
 export default {
   async render(el) {
@@ -133,12 +135,11 @@ const kpi = (cls, ico, label, value, desc, go = '') => `<div class="kpi ${cls} $
 function kpisHTML(k) {
   const a = k.actual || {};
   const abiertas = ABIERTAS.reduce((s, e) => s + (a[e] || 0), 0);
-  const cerradas = k.cerradas_aprobadas + k.cerradas_rechazadas;
   return `<div class="grid grid-4">
     ${kpi('k-green i-green', 'flask-conical', 'Pruebas abiertas', abiertas, 'Sin cerrar ni cancelar', '#/pruebas?estado=abiertas')}
     ${kpi('k-yellow i-yellow', 'factory', 'En proceso', a.en_ejecucion || 0, 'Iniciadas, con registro de las áreas', '#/pruebas?estado=en_ejecucion')}
     ${kpi('k-orange i-orange', 'gavel', 'Pendientes de dictamen', a.pendiente_dictamen || 0, 'Las áreas ya dieron su veredicto', '#/pruebas?estado=pendiente_dictamen')}
-    ${kpi(k.urgentes_abiertas ? 'danger i-red' : 'k-red i-red', 'siren', 'Urgentes abiertas', k.urgentes_abiertas, cerradas ? `${k.cerradas_aprobadas} aprobada(s) y ${k.cerradas_rechazadas} rechazada(s) cerradas en el periodo` : 'Con prioridad urgente')}
+    ${kpi('k-blue i-blue', 'archive', 'Pruebas cerradas', (a.cerrada_aprobada || 0) + (a.cerrada_rechazada || 0), `${a.cerrada_aprobada || 0} aprobada(s) · ${a.cerrada_rechazada || 0} rechazada(s)`, '#/pruebas?estado=cerradas')}
   </div>`;
 }
 

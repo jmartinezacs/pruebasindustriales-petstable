@@ -8,7 +8,7 @@
 // registra algún dato.
 // =====================================================================
 import {
-  sb, state, esc, icon, toast, errMsg, confirmDialog, mustRow, getCat, fmtDateTime, fmtDate, todayISO, pill, puedeEn, puedeArea,
+  sb, state, esc, icon, toast, errMsg, confirmDialog, mustRow, getCat, fmtDateTime, fmtDate, todayISO, pill, puedeEn, puedeArea, misAreas,
   AREAS, AREAS_ORDEN, COMPLEMENTARIAS, TIPOS_COMPLEMENTARIAS, refreshIcons,
 } from '../core.js';
 import { iconBtn, aviso, vacio, subirEvidencia } from './exp_comun.js';
@@ -106,7 +106,9 @@ export async function etapaProceso(pane, ctx) {
   const altaBatch = enProceso && puedeEn(P, 'ejecutar');
   const items = itemsDe(D.PL, D.met, { seccion: 'proceso' });
   const areas = AREAS_ORDEN.filter((a) => items.some((pl) => D.met(pl.metodo_id)?.area === a));
-  const grupos = areas.map((a) => [a, AREAS[a].label, (pl) => D.met(pl.metodo_id)?.area === a]);
+  // Las barras de cada registro muestran solo las áreas de quien consulta; la participación de todas va aparte
+  const vis = misAreas(P);
+  const grupos = areas.filter((a) => vis.includes(a)).map((a) => [a, AREAS[a].label, (pl) => D.met(pl.metodo_id)?.area === a]);
   const puede = enCaptura && puedeCapturarAlgo(P, areas);
   const Rgen = D.resDe((m) => m.nivel === 'corrida');
 
@@ -197,8 +199,9 @@ export async function etapaComplementarias(pane, ctx) {
   const tiles = [mosaico({ ico: 'layers', titulo: 'Toda la prueba', cls: 'ut-general', sub: 'Una muestra representativa de la prueba', grupos, items, R: D.resDe((m) => m.nivel === 'corrida'), attrs: 'data-co="general"', puede })]
     .concat(D.B.map((b) => mosaico({ ico: 'package', titulo: `${fab ? 'Batch' : 'Corrida'} #${b.numero}`, sub: fmtDateTime(b.fecha_hora),
       grupos, items, R: D.resDe((m) => m.nivel === 'batch' && m.batch_id === b.id), attrs: `data-co="cap" data-id="${esc(b.id)}"`, puede })));
-  pane.innerHTML = `<div class="card">
-    <div class="card-head"><div><h3>Evaluaciones complementarias</h3><p>Evaluación sensorial, microbiología y análisis bromatológicos. Forman parte de los parámetros de Calidad; se registran para toda la prueba o por batch.</p></div></div>
+  // Son parámetros de Calidad: para las demás áreas el apartado aparece contraído (se puede abrir)
+  pane.innerHTML = `<div class="card plegable ${misAreas(P).includes('calidad') ? '' : 'colapsada'}">
+    <div class="card-head"><div><h3>Evaluaciones complementarias</h3><p>Evaluación sensorial, microbiología y análisis bromatológicos. Forman parte de los parámetros de Calidad; se registran para toda la prueba o por batch.</p></div><span class="pleg-ico">${icon('chevron-down')}</span></div>
     <div class="compl-cats">${cats.map((c) => `<span class="chip on">${icon(ICO_CAT[c])} ${esc(NOM_CAT[c])}</span>`).join('')}</div>
     ${cats.includes('bromatologia') ? `<div class="notice info mt-s">${icon('hourglass')}<span>Los análisis bromatológicos (proteínas, grasas, humedad, cenizas) pueden quedar <b>pendientes de laboratorio</b>: no impiden evaluar ni dar el veredicto del área, y se completan cuando lleguen.</span></div>` : ''}
     ${!items.length ? vacio('Esta prueba no tiene evaluaciones complementarias en sus parámetros a evaluar.') : `<div class="unit-grid mt-s">${tiles.join('')}</div>`}

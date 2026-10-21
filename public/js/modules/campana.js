@@ -38,6 +38,28 @@ export function montarCampana() {
     const go = e.target.closest('[data-go]');
     if (go) { cerrar(); navigate(go.dataset.go); return; }
     if (e.target.closest('[data-bell="cerrar"]')) { cerrar(); return; }
+    // Marcar como hecho: lo quita solo de la lista de esta persona (p. ej. otro inspector ya lo registró)
+    const h = e.target.closest('[data-hecho]');
+    if (h) {
+      h.disabled = true;
+      try {
+        const { error } = await sb.rpc('prubind_pendiente_hecho', { p_prueba: h.dataset.hecho, p_accion: h.dataset.accion, p_area: h.dataset.area || null, p_hecho: true });
+        if (error) throw error;
+        h.closest('.bell-act')?.classList.add('hecho');
+        toast('Marcado como hecho. Ya no aparecerá en tus pendientes.', 'success');
+        setTimeout(() => { actualizarCampana(); document.dispatchEvent(new Event('prubind:pendientes')); }, 350);
+      } catch (err) { toast(errMsg(err), 'error'); h.disabled = false; }
+      return;
+    }
+    if (e.target.closest('[data-bell="restaurar"]')) {
+      try {
+        const { data, error } = await sb.rpc('prubind_pendientes_restablecer');
+        if (error) throw error;
+        toast(`${data} pendiente(s) vuelven a mostrarse.`, 'success');
+        actualizarCampana(); document.dispatchEvent(new Event('prubind:pendientes'));
+      } catch (err) { toast(errMsg(err), 'error'); }
+      return;
+    }
     const b = e.target.closest('[data-bell="notif"]');
     if (b) {
       b.disabled = true;
@@ -92,6 +114,8 @@ async function pintar() {
   const orden = { urgente: 0, alta: 1, normal: 2 };
   const pruebas = [...porPrueba.values()].sort((a, b) => (orden[a.prioridad] ?? 3) - (orden[b.prioridad] ?? 3) || String(a.folio).localeCompare(String(b.folio)));
   const est = await push.estado().catch(() => 'no-soportado');
+  // Cuántos marcó la persona como hechos (para poder volver a mostrarlos)
+  const { count: ocultos = 0 } = await sb.from('pendientes_hechos_prubind').select('id', { count: 'exact', head: true }).then((r) => r, () => ({}));
   const notif = est === 'inactivo'
     ? `<div class="bell-notif">${icon('bell-ring')}<span><b>Activa las notificaciones</b>Te avisaremos cuando te toque hacer algo.</span><button class="btn primary sm" data-bell="notif">Activar</button></div>`
     : est === 'instalar' ? `<div class="bell-notif">${icon('smartphone')}<span><b>Instala la app para recibir avisos</b>En iPhone: Compartir → “Agregar a pantalla de inicio”.</span></div>` : '';
@@ -101,9 +125,11 @@ async function pintar() {
     <div class="bell-list">${pruebas.length ? pruebas.map((p) => `<article class="bell-item prio-${esc(p.prioridad || 'normal')}">
         <div class="bi-top"><span class="pc-folio mono">${esc(p.folio)}</span>${p.prioridad !== 'normal' ? prioPill(p.prioridad) : ''}</div>
         <b class="bi-title">${esc(p.cambio)}</b>
-        ${p.acciones.map((x) => `<button type="button" class="pc-act acc-${x.accion}" data-go="#/pruebas?id=${esc(p.prueba_id)}&tab=${TAB_ACCION[x.accion] || ''}">
-          <span class="pa-ico">${icon(ACC[x.accion]?.[1] || 'dot')}</span><span class="pa-txt">${esc(ACC[x.accion]?.[0] || x.accion)}${x.area ? ` <em>· ${esc(AREAS[x.area]?.label || x.area)}</em>` : ''}</span>${icon('chevron-right')}</button>`).join('')}
+        ${p.acciones.map((x) => `<div class="bell-act"><button type="button" class="pc-act acc-${x.accion}" data-go="#/pruebas?id=${esc(p.prueba_id)}&tab=${TAB_ACCION[x.accion] || ''}">
+          <span class="pa-ico">${icon(ACC[x.accion]?.[1] || 'dot')}</span><span class="pa-txt">${esc(ACC[x.accion]?.[0] || x.accion)}${x.area ? ` <em>· ${esc(AREAS[x.area]?.label || x.area)}</em>` : ''}</span>${icon('chevron-right')}</button>
+          <button type="button" class="hecho-btn" data-hecho="${esc(p.prueba_id)}" data-accion="${esc(x.accion)}" data-area="${esc(x.area || '')}" title="Marcar como hecho" aria-label="Marcar como hecho: ${esc(ACC[x.accion]?.[0] || x.accion)}">${icon('check')}</button></div>`).join('')}
       </article>`).join('')
-      : `<div class="bell-empty">${icon('check-circle-2')}<b>Todo al día</b><span>Cuando una prueba requiera algo de ti, aparecerá aquí.</span></div>`}</div>`;
+      : `<div class="bell-empty">${icon('check-circle-2')}<b>Todo al día</b><span>Cuando una prueba requiera algo de ti, aparecerá aquí.</span></div>`}</div>
+    ${ocultos ? `<button type="button" class="link-btn bell-restaurar" data-bell="restaurar">${icon('rotate-ccw')} ${ocultos === 1 ? 'Volver a mostrar el pendiente que marcaste como hecho' : `Volver a mostrar los ${ocultos} pendientes que marcaste como hechos`}</button>` : ''}`;
   refreshIcons();
 }

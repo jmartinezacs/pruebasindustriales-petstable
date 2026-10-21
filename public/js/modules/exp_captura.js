@@ -10,7 +10,7 @@
 // =====================================================================
 import {
   sb, state, esc, icon, toast, openModal, nullIfEmpty, must, mustRow, getCat, opciones, unidadTxt, fmtDate,
-  todayISO, puedeEn, puedeArea, OPCIONES_TXT, AREAS, AREAS_ORDEN, COMPLEMENTARIAS, ayuda,
+  todayISO, puedeEn, puedeArea, misAreas, OPCIONES_TXT, AREAS, AREAS_ORDEN, COMPLEMENTARIAS, ayuda,
 } from '../core.js';
 import { aviso, criterioTxt, aLocal } from './exp_comun.js';
 
@@ -65,17 +65,17 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
   const ej = P.ejecucion_actual;
   const fab = P.ejecucion_form === 'fabricacion';
   const equipoAqui = conEquipo({ unidad, seccion, fab });
-  const [metodos, unidades, motivos, materias, plan, muestras, resultados, lotes, lotesMp, pars, controles] = await Promise.all([
+  const [metodos, unidades, motivos, materias, plan, muestras, resultados, lotes, nums, pars, controles] = await Promise.all([
     getCat('metodos'), getCat('unidades'), getCat('motivos'), getCat('materias'),
     sb.from('plan_evaluacion_prubind').select('*').eq('prueba_id', P.id).eq('incluido', true).order('orden'),
     sb.from('muestras_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej),
     sb.from('resultados_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej),
     unidad === 'batch' && seccion === 'proceso' ? sb.from('lotes_diarios_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej).order('fecha') : { data: [] },
-    { data: [] },
+    unidad === 'batch' && seccion === 'proceso' ? sb.from('batches_prubind').select('id, numero').eq('prueba_id', P.id).eq('ejecucion', ej) : { data: [] },
     equipoAqui ? sb.from('prueba_parametros_prubind').select('*').eq('prueba_id', P.id).order('orden') : { data: [] },
     equipoAqui ? sb.from('ejecucion_controles_prubind').select('*').eq('prueba_id', P.id).eq('ejecucion', ej) : { data: [] },
   ]);
-  [plan, muestras, resultados, lotes, lotesMp, pars, controles].forEach((r) => { if (r.error) throw r.error; });
+  [plan, muestras, resultados, lotes, nums, pars, controles].forEach((r) => { if (r.error) throw r.error; });
   const un = (id) => unidadTxt(unidades, id);
   const met = (id) => metodos.find((m) => m.id === id);
   const mpNom = (id) => materias.find((m) => m.id === id)?.nombre || '';
@@ -91,7 +91,12 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
   const muestra = muestras.data.find((s) => (unidad === 'batch' ? s.nivel === 'batch' && s.batch_id === batch?.id
     : unidad === 'punto' ? s.punto_id === punto?.id : s.nivel === 'corrida'));
   const R = muestra ? resultados.data.filter((r) => r.muestra_id === muestra.id) : [];
-  const items = itemsDe(plan.data, met, { unidad, seccion, fab });
+  // Solo se muestran las áreas de quien registra (el administrador y quien solo consulta ven todas)
+  const todosItems = itemsDe(plan.data, met, { unidad, seccion, fab });
+  const editablesTodos = todosItems.filter((pl) => capArea(met(pl.metodo_id).area));
+  const verAreas = new Set([...misAreas(P), ...editablesTodos.map((pl) => met(pl.metodo_id).area)]);
+  const items = todosItems.filter((pl) => verAreas.has(met(pl.metodo_id).area));
+  const ocultas = todosItems.length - items.length;
   const editables = items.filter((pl) => capArea(met(pl.metodo_id).area));
 
   // Apartados por área (Calidad, complementarias por categoría, Producción, Seguridad, Mantenimiento)
@@ -132,8 +137,12 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
   if (unidad === 'batch' && seccion === 'proceso') {
     const dis = ejecuta ? '' : 'disabled';
     const nounL = fab ? 'batch' : 'corrida';
+    // Número de batch según la programación del día (p. ej. 29, 30, 31); se sugiere el siguiente
+    const siguienteNum = nums.data.reduce((mx, b) => Math.max(mx, b.numero), 0) + 1;
     cabecera = `
-      ${nuevo ? `<div class="field"><label for="cp-f">Fecha y hora ${ayuda(`El número de ${nounL} se asigna solo, en orden.`)}</label><input id="cp-f" name="fecha_hora" type="datetime-local" required value="${aLocal(new Date())}"></div>` : ''}
+      <div class="field"><label for="cp-num">Número de ${nounL} <span class="req">*</span> ${ayuda(`El número que tiene el ${nounL} en la programación del día (por ejemplo 29, 30 o 31).`)}</label>
+        <input id="cp-num" name="numero" type="number" inputmode="numeric" min="1" max="999" step="1" required value="${batch ? batch.numero : siguienteNum}" ${dis}></div>
+      ${nuevo ? `<div class="field"><label for="cp-f">Fecha y hora</label><input id="cp-f" name="fecha_hora" type="datetime-local" required value="${aLocal(new Date())}"></div>` : ''}
       <div class="field full"><span class="label">¿${fab ? 'El batch se produjo' : 'La corrida se hizo'} sin problemas?</span>
         <div class="seg" role="radiogroup">${[['conforme', 'Sí'], ['no_conforme', 'No, hubo una desviación']].map(([k, l]) => `<label class="seg-opt"><input type="radio" name="op" value="${k}" ${k === (batch?.resultado_op === 'no_conforme' ? 'no_conforme' : 'conforme') ? 'checked' : ''} ${dis}><span>${l}</span></label>`).join('')}</div></div>
       <div class="field full hidden" id="cp-inc-w"><div class="form-grid">
@@ -144,7 +153,7 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
 
   // ---------- Parámetros del equipo (Producción) ----------
   let equipoHTML = '';
-  if (equipoAqui && pars.data.length) {
+  if (equipoAqui && pars.data.length && verAreas.has('produccion')) {
     const dis = equipoEdit ? '' : 'disabled';
     const C = controles.data;
     equipoHTML = `<div class="form-section">${icon('gauge')} Parámetros del equipo <span class="cell-sub">· Producción</span></div>
@@ -163,7 +172,7 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
   return openModal({
     title: `${titulo}${seccion === 'complementarias' && unidad === 'batch' ? ' · complementarias' : ''}`, subtitle: `${P.folio} · ${P.cambio}`, size: 'lg', submitText: puedeAlgo ? 'Guardar' : 'Cerrar',
     body: `<div class="unit-banner ${unidad === 'batch' ? 'is-batch' : 'is-general'}"><span class="ub-ico">${icon(unidad === 'batch' ? 'package' : 'layers')}</span>
-        <div><small>Registrando en</small><b>${esc(titulo)}</b><span>${unidad === 'batch' ? `Valores medidos en este ${fab ? 'batch' : 'corrida'}. Lo que se mide una sola vez va en «Toda la prueba».` : `Lo que se mide una sola vez (merma total, condiciones de seguridad…). Lo que se mide por ${fab ? 'batch' : 'corrida'} se registra en cada uno.`}</span></div></div>${!puedeAlgo ? aviso('Solo consulta: cada área registra sus propios parámetros.') : editables.length < items.length ? `<p class="hint">Usted registra los parámetros de su área; los demás se muestran como consulta.</p>` : ''}
+        <div><small>Registrando en</small><b>${esc(titulo)}</b><span>${unidad === 'batch' ? `Valores medidos en este ${fab ? 'batch' : 'corrida'}. Lo que se mide una sola vez va en «Toda la prueba».` : `Lo que se mide una sola vez (merma total, condiciones de seguridad…). Lo que se mide por ${fab ? 'batch' : 'corrida'} se registra en cada uno.`}</span></div></div>${!puedeAlgo ? aviso('Solo consulta: cada área registra sus propios parámetros.') : editables.length < items.length ? `<p class="hint">Usted registra los parámetros de su área; los demás se muestran como consulta.</p>` : ''}${ocultas ? `<p class="hint">${icon('eye-off')} Solo se muestran los parámetros de su área. Lo que registran las demás áreas se ve en «Participación por área».</p>` : ''}
       <div class="form-grid">${cabecera}${equipoHTML}
       ${secciones.map((k) => `<div class="form-section">${tituloSec(k)}${k === 'microbiologia' ? ` ${ayuda('Capture cada dilución leída en UFC/g. Puede dejar en blanco lo que aún no tenga lectura y completarlo después.')}` : ''}${k === 'bromatologia' ? ` <span class="sec-note">${icon('hourglass')} Puede quedar pendiente de laboratorio</span>` : ''}</div>
         <div class="cap-grid">${grupos[k].map(campo).join('')}</div>`).join('')}
@@ -197,20 +206,25 @@ export async function capturaForm(P, { unidad, seccion = 'proceso', batch = null
       const f = form.elements;
       const faltaJust = [...form.querySelectorAll('.cap-just:not(.hidden) input:not([disabled])')].find((i) => !i.value.trim());
       if (faltaJust) { faltaJust.focus(); setError('Explique brevemente los valores que no cumplen.'); return false; }
+      if (unidad === 'batch' && seccion === 'proceso' && ejecuta) {
+        const n = Number(f.numero.value);
+        if (!Number.isInteger(n) || n < 1 || n > 999) { f.numero.focus(); setError(`Indique el número de ${fab ? 'batch' : 'corrida'} (1 a 999).`); return false; }
+        if (nums.data.some((b) => b.numero === n && b.id !== batch?.id)) { f.numero.focus(); setError(`Ya existe el ${fab ? 'batch' : 'corrida'} número ${n} en esta prueba.`); return false; }
+      }
       if (unidad === 'batch' && seccion === 'proceso' && ejecuta && f.op?.value === 'no_conforme' && !f.inc.value.trim()) { f.inc.focus(); setError('Describa qué pasó en el batch.'); return false; }
 
       // 1. Batch (alta o datos generales)
       let batchId = batch?.id;
       let loteId = null;
       if (unidad === 'batch' && seccion === 'proceso' && ejecuta) {
-        const datos = { resultado_op: f.op?.value || 'conforme', motivo_desviacion_id: f.op?.value === 'no_conforme' ? nullIfEmpty(f.motivo.value) : null,
+        const datos = { numero: Number(f.numero.value), resultado_op: f.op?.value || 'conforme', motivo_desviacion_id: f.op?.value === 'no_conforme' ? nullIfEmpty(f.motivo.value) : null,
           incidencias: f.op?.value === 'no_conforme' ? nullIfEmpty(f.inc.value) : null };
         if (nuevo) {
           // Lote del día: se crea solo con el primer batch del día
           loteId = loteHoy?.id || must(await sb.from('lotes_diarios_prubind').insert({ prueba_id: P.id, codigo: codigoLoteHoy(), fecha: todayISO() }).select('id').single()).data.id;
-          batchId = must(await sb.from('batches_prubind').insert({ ...datos, prueba_id: P.id, lote_diario_id: loteId, numero: 0,
+          batchId = must(await sb.from('batches_prubind').insert({ ...datos, prueba_id: P.id, lote_diario_id: loteId,
             fecha_hora: new Date(f.fecha_hora.value).toISOString(), responsable_id: state.profile.id }).select('id').single()).data.id;
-        } else if (['resultado_op', 'motivo_desviacion_id', 'incidencias'].some((k) => String(datos[k] ?? '') !== String(batch[k] ?? ''))) {
+        } else if (['numero', 'resultado_op', 'motivo_desviacion_id', 'incidencias'].some((k) => String(datos[k] ?? '') !== String(batch[k] ?? ''))) {
           mustRow(await sb.from('batches_prubind').update(datos).eq('id', batch.id).select('id'));
         }
         previo = { lote: loteId || batch?.lote_diario_id };

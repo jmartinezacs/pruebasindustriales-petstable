@@ -358,3 +358,14 @@ Migración `20261020002000_prubind_v52_avisos_pendientes.sql`; Edge Functions `n
 
 - **v5.2.1:** el ícono es la imagen original completa (esquinas redondeadas, sin recortes ni bordes) en iPhone, Android, computadora y avisos; la campana de pendientes pasó a ser un botón flotante junto a "Nueva prueba" e "Inicio".
 - **v5.2.2:** campana dorada en vector como botón flotante; nombre corto "Pruebas" al instalar (Android/iPhone) y en el encabezado del celular; identidad nueva de la app (`id: /pruebas`) para que la instalación en computadora tome el ícono verde; cerrar sesión ya no da de baja las notificaciones del dispositivo (migración `20261021002100_prubind_v522_vincular_push.sql`).
+
+## v5.3 · Pendientes "hechos", vista por área y número de batch (21/10/2026)
+
+Migración `20261021002200_prubind_v53_pendientes_hechos.sql`.
+
+- **Marcar como hecho** en la campana: quita el pendiente solo de la lista de esa persona (p. ej. si otro inspector ya registró los datos); se puede volver a mostrar. También se refleja en el panel y en el recordatorio diario.
+- **Vista por área:** al registrar durante el proceso solo aparecen los parámetros de las áreas de la persona; en Resultados, Recomendaciones y Evaluaciones complementarias las demás áreas aparecen contraídas (se abren al tocarlas). Participación por área la ven todos; el administrador ve todo.
+- **Número de batch** escrito por quien registra (p. ej. 29, 30, 31), sin repetir dentro de la prueba.
+- KPI "Pruebas cerradas" en lugar de "Urgentes abiertas"; filtro "Cerradas" en Pruebas.
+- Borde de la gráfica de pastel blanco al cambiar a modo claro; título completo "Pruebas industriales" en el celular (el botón Salir queda en el menú); subtítulo "Calidad de proceso".
+- Íconos de 48, 96, 144 y 256 px en el manifiesto (acceso directo de Windows).

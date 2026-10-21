@@ -822,9 +822,13 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
 }
 .bell-acts { display: flex; gap: 6px; }
 
-/* v5.2.2 · Título corto en el celular */
+/* v5.3 · Título completo en el celular (letra más chica; el botón Salir pasa al menú) */
 .top-title .t-corto { display: none; }
-@media (max-width: 720px) { .top-title .t-largo { display: none; } .top-title .t-corto { display: inline; } }
+@media (max-width: 720px) {
+  .top-title h2 { font-size: 15px; letter-spacing: -.02em; }
+  .header-actions .hbtn[data-action="logout"] { display: none; }
+}
+@media (max-width: 380px) { .top-title h2 { font-size: 13.5px; } }
 
 /* v5.2.2 · Campana dorada en vector (en lugar del círculo turquesa) */
 .fab-bell { background: #fff; border: 2px solid rgba(240, 170, 20, .55); box-shadow: 0 10px 26px rgba(15, 35, 50, .25); }
@@ -833,3 +837,21 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
 .fab-bell.has .bell-svg { animation: campana 2.4s ease-in-out infinite; transform-origin: 50% 12%; }
 .fab-bell.has svg:not(.bell-svg) { animation: none; }
 @media (max-width: 640px) { .fab-bell .bell-svg { width: 32px; height: 32px; } }
+
+/* v5.3 · Marcar pendiente como hecho, apartados contraíbles y KPI de cerradas */
+.bell-act { display: flex; gap: 6px; align-items: stretch; transition: opacity .3s, transform .3s; }
+.bell-act .pc-act { flex: 1 1 auto; min-width: 0; }
+.hecho-btn { flex: 0 0 auto; width: 40px; border-radius: 12px; border: 1px solid var(--ok-line); background: var(--ok-bg); color: var(--ok); display: grid; place-items: center; cursor: pointer; }
+.hecho-btn svg { width: 18px; height: 18px; stroke-width: 3; }
+.hecho-btn:hover { background: #16A34A; border-color: #16A34A; color: #fff; }
+.bell-act.hecho { opacity: .35; transform: translateX(8px); }
+.bell-restaurar { align-self: center; font-size: 12.5px; }
+.plegable > .card-head { cursor: pointer; }
+.pleg-ico { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--soft); color: var(--muted); flex: 0 0 auto; }
+.pleg-ico svg { width: 18px; height: 18px; transition: transform .2s; }
+.plegable.colapsada .pleg-ico svg { transform: rotate(-90deg); }
+.plegable.colapsada > :not(.card-head) { display: none !important; }
+.plegable.colapsada > .card-head { margin-bottom: 0; }
+.plegable.colapsada { opacity: .85; }
+.kpi.i-blue .kpi-ico { background: linear-gradient(135deg, #2563EB, #60A5FA) !important; }
+.kpi.k-blue::before { background: #2563EB; }

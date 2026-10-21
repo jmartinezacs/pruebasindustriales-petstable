@@ -56,6 +56,14 @@ export function puedeEn(p, accion) {
 }
 // ¿Captura (rol 'capturar') o evalúa (rol 'evaluar') parámetros de esa área?
 export const puedeArea = (p, rol, area) => !!p && autoridad(p.tipo, `${rol}_${area}`);
+// Áreas que la persona atiende en una prueba (registra o evalúa). El administrador y quien no
+// atiende ningún área (solo consulta) ven todas; los demás ven abiertas solo las suyas.
+export function misAreas(p) {
+  const todas = ['calidad', 'produccion', 'seguridad', 'mantenimiento'];
+  if (!p || state.isAdmin) return todas;
+  const mias = todas.filter((a) => puedeArea(p, 'capturar', a) || puedeArea(p, 'evaluar', a));
+  return mias.length ? mias : todas;
+}
 
 // ---------- Formato y fechas ----------
 export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -566,6 +574,8 @@ export function makeChart(canvas, config) {
   (config.data?.datasets || []).forEach((ds) => {
     if (dona) Object.assign(ds, { borderWidth: 2, borderColor: card, hoverOffset: 6, ...ds });
     else if ((ds.type || config.type) === 'bar') Object.assign(ds, { borderRadius: 4, borderSkipped: apilada ? false : 'start', ...(apilada ? { borderWidth: horizontal ? { right: 2 } : { top: 2 }, borderColor: card } : {}), ...ds });
+    // Separación con el color de la superficie: se repinta al cambiar entre modo claro y oscuro
+    if (ds.borderColor === card) ds._separador = true;
   });
   const valor = horizontal ? 'x' : 'y', categoria = horizontal ? 'y' : 'x';
   const ejes = dona ? {} : {
@@ -596,10 +606,12 @@ export function makeChart(canvas, config) {
 }
 // Cambio de tema inmediato: re-colorea las gráficas sin volver a consultar datos
 export function restyleCharts() {
-  const muted = cssVar('--muted'), line = cssVar('--line'), text = cssVar('--text');
+  const muted = cssVar('--muted'), line = cssVar('--line'), text = cssVar('--text'), card = cssVar('--card') || '#ffffff';
   charts.forEach((c) => {
     try {
       const o = c.options;
+      // Borde blanco en modo claro y del color de la tarjeta en oscuro (dona y barras apiladas)
+      c.data.datasets.forEach((ds) => { if (ds._separador) ds.borderColor = card; });
       if (o.plugins?.legend?.labels) o.plugins.legend.labels.color = text;
       for (const s of Object.values(o.scales || {})) {
         if (s.ticks) s.ticks.color = muted;
@@ -882,6 +894,15 @@ document.addEventListener('click', (e) => {
   const lab = e.target.closest('label[for]');
   const c = lab && document.getElementById(lab.htmlFor);
   if (c?._cs?.btn) { e.preventDefault(); c._cs.btn.focus(); }
+});
+
+// ---------- Apartados contraíbles (.plegable): tocar el encabezado abre o cierra ----------
+document.addEventListener('click', (e) => {
+  const head = e.target.closest('.plegable > .card-head');
+  if (!head || e.target.closest('button, a, input, select, textarea, label')) return;
+  const card = head.parentElement;
+  card.classList.toggle('colapsada');
+  head.setAttribute('aria-expanded', String(!card.classList.contains('colapsada')));
 });
 
 // ---------- Avisos (notificaciones push) ----------

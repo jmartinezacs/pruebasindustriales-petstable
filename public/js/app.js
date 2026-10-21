@@ -292,13 +292,13 @@ export function setTheme(t) {
   else { document.documentElement.removeAttribute('data-theme'); prefs.del('prubind.theme'); }
   updateThemeButton();
   // Solo re-colorea las gráficas (sin volver a cargar la vista): cambio inmediato
-  requestAnimationFrame(restyleCharts);
+  setTimeout(restyleCharts, 30);
 }
 window.__prubindSetTheme = setTheme;
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
   if (currentTheme() !== 'system') return;
   updateThemeButton();
-  requestAnimationFrame(restyleCharts);
+  setTimeout(restyleCharts, 30);
 });
 function effectiveDark() {
   const t = currentTheme();
