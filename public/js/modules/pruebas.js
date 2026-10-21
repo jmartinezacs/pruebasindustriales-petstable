@@ -83,17 +83,18 @@ async function renderLista(params) {
     rowClass: (p) => `row-link ${p.prioridad === 'urgente' && !CERRADAS.includes(p.estado) ? 'row-urg' : ''}`,
     columns: [
       { label: 'Folio', sort: 'folio', render: (p) => `<b class="mono">${esc(p.folio)}</b><div class="cell-sub">${esc(p.tipo_nombre)}</div>` },
-      { label: 'Prueba', sort: 'cambio', render: (p) => `<div class="cell-main">${esc(p.cambio)}</div><div class="cell-sub">${esc(objetoTxt(p) || '—')}</div>` },
+      { label: 'Prueba', sort: 'cambio', render: (p) => `<div class="cell-main">${esc(p.cambio)}</div>${objetoTxt(p) ? `<div class="cell-sub">${esc(objetoTxt(p))}</div>` : ''}` },
       { label: 'Prioridad', sort: 'prioridad', render: (p) => prioPill(p.prioridad) },
-      { label: 'Responsable', render: (p) => { const otro = p.responsable_inicial_id && p.responsable_inicial_id !== p.registrado_por;
-        return `<div class="user-cell">${otro ? avatarHTML(p.responsable_inicial_nombre, null, 'sm') : avatarHTML(p.registrado_por_nombre, p.registrado_por_foto, 'sm')}<div class="user-txt"><div class="cell-main">${esc(otro ? p.responsable_inicial_nombre : p.registrado_por_nombre)}</div>${otro ? `<div class="cell-sub">Registró: ${esc(p.registrado_por_nombre)}</div>` : ''}${p.responsable_ejecucion_nombre ? `<div class="cell-sub">Ejec.: ${esc(p.responsable_ejecucion_nombre)}</div>` : ''}</div></div>`; } },
+      { label: 'Responsable', render: (p) => { const rid = p.responsable_inicial_id || p.registrado_por; const u = usuarios.find((x) => x.id === rid);
+        const nom = p.responsable_inicial_nombre || u?.nombre || p.registrado_por_nombre;
+        return `<div class="user-cell">${avatarHTML(nom, u?.foto_url || (rid === p.registrado_por ? p.registrado_por_foto : null), 'sm')}<div class="user-txt"><div class="cell-main">${esc(nom)}</div></div></div>`; } },
       { label: 'Etapa', render: (p) => etapasMini(p) },
       { label: 'Estado', sort: 'estado', render: (p) => `${estadoPill(p.estado)}${p.ejecucion_actual > 1 ? `<div class="cell-sub">Ejecución #${p.ejecucion_actual}</div>` : ''}` },
       { label: 'Registrada', sort: 'created_at', render: (p) => `<span class="mono">${fmtDate(p.created_at.slice(0, 10))}</span>` },
     ],
     empty: { ico: 'flask-conical', title: 'Sin pruebas', text: 'Registre una prueba previamente acordada con “Nueva prueba industrial”.' },
     fetch: async ({ from, to, sort, filters: f }) => {
-      const { data, count } = must(await paged(consulta(f, 'id, folio, tipo, tipo_nombre, cambio, producto_nombre, receta_nombre, receta_version, materia_prima_nombre, proveedor_nombre, equipo_nombre, empaque, proceso, prioridad, registrado_por_nombre, registrado_por_foto, responsable_ejecucion_nombre, estado, ejecucion_actual, created_at'), { from, to, sort }, [['created_at', false]]));
+      const { data, count } = must(await paged(consulta(f, 'id, folio, tipo, tipo_nombre, cambio, producto_nombre, receta_nombre, receta_version, materia_prima_nombre, proveedor_nombre, equipo_nombre, empaque, proceso, prioridad, registrado_por, registrado_por_nombre, registrado_por_foto, responsable_inicial_id, responsable_inicial_nombre, estado, ejecucion_actual, created_at'), { from, to, sort }, [['created_at', false]]));
       return { rows: data, count };
     },
   });
@@ -343,7 +344,7 @@ function pintar() {
         <div class="ph-title">
           <span class="eyebrow">${esc(P.folio)} · ${esc(P.tipo_nombre)}${P.ejecucion_actual > 1 ? ` · ejecución #${P.ejecucion_actual}` : ''}</span>
           <h1>${esc(P.cambio)}</h1>
-          <p>${esc(objetoTxt(P) || 'Sin objeto especificado')} · Registró ${esc(P.registrado_por_nombre)} el ${fmtDateTime(P.created_at)}</p>
+          <p>${objetoTxt(P) ? `${esc(objetoTxt(P))} · ` : ''}Registró ${esc(P.registrado_por_nombre)} el ${fmtDateTime(P.created_at)}</p>
         </div>
         <div class="ph-estado">${estadoPill(P.estado)} ${prioPill(P.prioridad)}</div>
       </div>
@@ -516,8 +517,8 @@ async function tabRegistro(pane) {
         <h3 class="rg-nombre">${esc(P.cambio)}</h3>
         <p class="rg-obj">${icon('target')}<span><small>Objetivo</small>${esc(P.objetivo_desc || P.objetivo_nombre || 'Sin objetivo')}${P.objetivo_desc && P.objetivo_nombre && !/^otro/i.test(P.objetivo_nombre) ? ` · <span class="cell-sub">${esc(P.objetivo_nombre)}</span>` : ''}</span></p>
         <div class="rg-datos">
-          ${dato('calendar', 'Fecha de ejecución', fecha)}
-          ${dato('user-check', 'Responsable (inicia y termina)', `<span class="rd-resp">${avatarHTML(resp?.nombre || P.responsable_inicial_nombre || P.registrado_por_nombre, resp?.foto_url, 'xs')} ${esc(resp?.nombre || P.responsable_inicial_nombre || P.registrado_por_nombre)}</span>`)}
+          ${dato('calendar', 'Fecha de ejecución', `<span class="rd-fecha">${fecha}</span>`)}
+          ${dato('user-check', 'Responsable', `<span class="rd-resp">${avatarHTML(resp?.nombre || P.responsable_inicial_nombre || P.registrado_por_nombre, resp?.foto_url, 'xs')} ${esc(resp?.nombre || P.responsable_inicial_nombre || P.registrado_por_nombre)}</span>`)}
           ${dato('flag', 'Prioridad', `${prioPill(P.prioridad)}${P.prioridad_just ? `<span class="rd-sub">${esc(P.prioridad_just)}</span>` : ''}`)}
           ${(P.campos_registro || []).filter((k) => VAL[k]).map((k) => dato(ICO[k] || 'circle', CAMPOS_REGISTRO[k], esc(VAL[k]))).join('')}
         </div>

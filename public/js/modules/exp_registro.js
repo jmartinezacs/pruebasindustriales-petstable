@@ -132,7 +132,7 @@ export function montarSelector(cont, { getTipo, puedeDefinir }) {
         return `<div class="area-block ${involucrada ? '' : 'off'}" data-area="${area}">${cabeza}${toggle}
           ${involucrada ? `<p class="hint area-nota">${icon('info')} ${esc(A.label)} define sus propios parámetros desde la prueba, una vez registrada.</p>` : ''}</div>`;
       }
-      const base = plantilla.map((pt) => ({ m: met(pt.metodo_id), def: pt.obligatorio })).filter((x) => x.m && x.m.activo !== false && x.m.area === area);
+      const base = plantilla.map((pt) => ({ m: met(pt.metodo_id), def: false })).filter((x) => x.m && x.m.activo !== false && x.m.area === area);
       (extra[area] || []).forEach((id) => { if (!base.some((x) => x.m.id === id) && met(id)) base.push({ m: met(id), def: true }); });
       const proceso = base;
       return `<div class="area-block propia ${involucrada ? '' : 'off'}" data-area="${area}">${cabeza}${toggle}
@@ -140,7 +140,7 @@ export function montarSelector(cont, { getTipo, puedeDefinir }) {
           <p class="hint area-nota">${icon('user-check')} Usted define los parámetros de ${esc(A.label)}.</p>
           ${proceso.length ? `<div class="chk-grid">${proceso.map((x) => fila(x.m, x.def)).join('')}</div>` : ''}
           ${!base.length ? '<p class="hint">Sin parámetros sugeridos para este tipo de prueba.</p>' : ''}
-          <button type="button" class="link-btn" data-add="${area}">${icon('plus')} Agregar parámetro de ${esc(A.label)}</button>
+          <button type="button" class="btn teal sm add-par" data-add="${area}">${icon('plus')} Agregar parámetro de ${esc(A.label)}</button>
         </div></div>`;
     }).join('');
     refreshIcons();
@@ -235,8 +235,8 @@ export async function montarParametrosPrueba(el, P, recargar) {
         ${proc.length ? `<ul class="param-list">${proc.map((x) => item(x, area)).join('')}</ul>` : ''}
         ${area === 'produccion' && pars.data.length ? `<div class="sub-title">Parámetros del equipo (${esc(P.equipo_nombre || 'equipo')})</div><ul class="param-list">${pars.data.map((x) =>
           `<li><span>${esc(x.nombre)} <span class="cell-sub">· ${esc(x.minimo != null || x.maximo != null ? criterioTxt({ crit_minimo: x.minimo, crit_maximo: x.maximo }, unidadTxt(unidades, x.unidad_id)) : (x.referencia || '').split(' · ')[0] || 'referencia del equipo')}</span></span></li>`).join('')}</ul>` : ''}
-        <div class="area-acts">${editaArea(area) ? `<button type="button" class="${sinDefinir ? 'btn primary sm' : 'link-btn'}" data-par="${sinDefinir ? 'definir' : 'agregar'}" data-area="${area}">${icon(sinDefinir ? 'list-checks' : 'plus')} ${sinDefinir ? 'Definir parámetros' : 'Agregar parámetro'}</button>
-          ${!xs.some((x) => usados.has(x.pl.id)) && !(area === 'produccion' && pars.data.length) ? `<button type="button" class="btn ghost sm" data-par="nada" data-area="${area}">${icon('circle-slash')} Nada que evaluar por mi área</button>` : ''}` : ''}</div></div>`;
+        <div class="area-acts">${editaArea(area) ? `<button type="button" class="btn ${sinDefinir ? 'turq' : 'teal'} sm add-par" data-par="${sinDefinir ? 'definir' : 'agregar'}" data-area="${area}">${icon(sinDefinir ? 'list-checks' : 'plus')} ${sinDefinir ? 'Definir parámetros' : 'Agregar parámetro'}</button>
+          ${!xs.length && !(area === 'produccion' && pars.data.length) ? `<button type="button" class="btn sm nada-btn" data-par="nada" data-area="${area}">${icon('circle-slash')} Nada que evaluar por mi área</button>` : ''}` : ''}</div></div>`;
     }).join('')}</div>
     ${sumables.length ? `<p class="hint mt-s">¿La prueba involucra otra área? ${sumables.map((a) => `<button type="button" class="link-btn" data-par="incluir" data-area="${a}">${icon('plus')} ${esc(AREAS[a].label)}</button>`).join(' ')}</p>` : ''}
   </div>`;
@@ -290,7 +290,7 @@ export async function montarParametrosPrueba(el, P, recargar) {
 // Elegir de una vez los parámetros sugeridos de un área (desde el expediente)
 async function definirForm(P, area) {
   const [metodos, unidades, plantilla] = await Promise.all([getCat('metodos'), getCat('unidades'), plantillaDe(P.tipo)]);
-  const base = plantilla.map((pt) => ({ m: metodos.find((x) => x.id === pt.metodo_id), def: pt.obligatorio }))
+  const base = plantilla.map((pt) => ({ m: metodos.find((x) => x.id === pt.metodo_id), def: false }))
     .filter((x) => x.m && x.m.activo !== false && x.m.area === area);
   const extra = [];
   const pintar = (form) => {

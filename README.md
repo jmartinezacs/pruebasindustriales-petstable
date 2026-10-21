@@ -407,3 +407,11 @@ Migración `20261021002200_prubind_v53_pendientes_hechos.sql`.
 - **Código automático** de cada parámetro: área + palabras del nombre (p. ej. `CAL-TEMP-COCC`, `SEG-EQUI-PROT`); se recalcularon todos. La humedad bromatológica se renombró "Humedad (laboratorio)".
 - Botones de acción con más colores (turquesa, verde, azul y violeta; naranja para lo principal). En *En proceso* se quitaron "Batches registrados" y "¿Falta un parámetro?".
 - Migraciones `20261022002600`–`20261022002900`; pruebas `tests/sql/pruebas_flujo_v58.sql` (10/10).
+
+## v5.9 · Ajustes de registro, códigos PAR y tablas (22/10/2026)
+- Encabezado sin "Sin objeto especificado"; en la ficha de Registro, "Responsable" y la fecha de ejecución en un renglón.
+- "Nada que evaluar por mi área" (ámbar) solo aparece si el área aún no tiene parámetros; "Agregar parámetro" como botón.
+- Al definir parámetros ya no viene ninguno marcado por defecto.
+- La lista de pruebas muestra al responsable asignado (antes salía quien registró).
+- Código de parámetros consecutivo `PAR-001`, `PAR-002`… (se asigna al crear y no cambia); migración `20261022003000_prubind_v59_codigo_par.sql`.
+- Tablas con las acciones siempre en un renglón.
