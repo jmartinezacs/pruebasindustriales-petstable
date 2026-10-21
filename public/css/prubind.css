@@ -868,13 +868,9 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
 
 /* v5.5 · App instalada en pantalla completa
    - Android: display fullscreen; el encabezado incluye la zona segura superior (muesca).
-   - Computadora: window-controls-overlay; sin barra de título, el encabezado sirve para mover la ventana
-     y deja libre la esquina de los botones de minimizar, maximizar y cerrar. */
+   - Computadora: pantalla completa con la API Fullscreen (v5.5.1, ver app.js). */
 :root { --header-h: calc(72px + env(safe-area-inset-top, 0px)); }
 @media (max-width: 720px) { :root { --header-h: calc(64px + env(safe-area-inset-top, 0px)); } }
 .top { padding-top: env(safe-area-inset-top, 0px); }
 @media (max-width: 760px) { .update-bar { top: calc(var(--header-h, 64px) + 8px); } }
-@media (display-mode: window-controls-overlay) {
-  .top { -webkit-app-region: drag; app-region: drag; padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 16px); }
-  .top button, .top a, .top input, .top select, .top-user, .live { -webkit-app-region: no-drag; app-region: no-drag; }
-}
+.fs-btn { padding: 0; width: 40px; }
