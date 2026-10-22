@@ -54,9 +54,11 @@ export async function parametroForm({ area = null, tipo = null, excluir = [], me
         ${opciones(areasOk.map((a) => ({ id: a, nombre: AREAS[a].label })), metodo?.area || (areasOk.length === 1 ? areasOk[0] : ''), { vacio: 'Selecciona…' })}</select></div>`}
       <div id="pf-nuevo">
         <div class="field"><span class="label">¿Cómo se cuantifica? <span class="req">*</span></span>
-          <div class="seg" role="radiogroup">
-            <label class="seg-opt"><input type="radio" name="tipo" value="numerico" ${tipoIni === 'numerico' ? 'checked' : ''}><span>Cuantitativo (valor)</span></label>
-            <label class="seg-opt"><input type="radio" name="tipo" value="opcion" ${tipoIni === 'opcion' ? 'checked' : ''}><span>Cualitativo (conforme / no conforme)</span></label></div></div>
+          <div class="cuanti-opts" role="radiogroup" aria-label="¿Cómo se cuantifica?">
+            <label class="cuanti-opt"><input type="radio" name="tipo" value="numerico" ${tipoIni === 'numerico' ? 'checked' : ''}>
+              <span class="co-ico">${icon('ruler')}</span><span class="co-txt"><b>Cuantitativo</b><small>Se mide con un valor (p. ej. 6.5 %)</small></span></label>
+            <label class="cuanti-opt"><input type="radio" name="tipo" value="opcion" ${tipoIni === 'opcion' ? 'checked' : ''}>
+              <span class="co-ico">${icon('list-checks')}</span><span class="co-txt"><b>Cualitativo</b><small>Conforme / no conforme</small></span></label></div></div>
         <div class="field" id="pf-u-w"><label for="pf-u">Unidad ${ayuda('Por ejemplo %, °C, min, kg. Déjela vacía si el valor no lleva unidad.')}</label>
           <select id="pf-u" name="unidad">${opciones(unidades, metodo?.unidad_id || null, { label: (u) => `${u.simbolo} · ${u.nombre}`, vacio: 'Sin unidad' })}</select></div>
       </div>`,
@@ -227,7 +229,7 @@ export async function montarParametrosPrueba(el, P, recargar) {
         return `<div class="area-block area-na"><div class="area-head">${icon(AREAS[area].ico)}<div><b>${esc(AREAS[area].label)}</b><span>${esc(AREAS[area].desc)}</span></div>
             <span class="area-tag na">${icon('circle-slash')} Sin nada que evaluar</span></div>
           <p class="hint area-nota">${esc(dec.por?.nombre || 'El responsable')} indicó que su área no tiene nada que evaluar en esta prueba${dec.motivo ? `: “${esc(dec.motivo)}”` : '.'}</p>
-          <div class="area-acts">${editaArea(area) ? `<button type="button" class="link-btn" data-par="retomar" data-area="${area}">${icon('rotate-ccw')} Sí hay algo que evaluar</button>` : ''}</div></div>`;
+          <div class="area-acts">${editaArea(area) ? `<button type="button" class="btn teal sm add-par" data-par="retomar" data-area="${area}">${icon('rotate-ccw')} Sí hay algo que evaluar</button>` : ''}</div></div>`;
       }
       return `<div class="area-block ${sinDefinir ? 'pendiente' : ''}"><div class="area-head">${icon(AREAS[area].ico)}<div><b>${esc(AREAS[area].label)}</b><span>${esc(AREAS[area].desc)}</span></div>
           ${sinDefinir ? `<span class="area-tag wait">${icon('hourglass')} Por definir</span>` : `<span class="area-tag ok">${xs.length + (area === 'produccion' ? pars.data.length : 0)} parámetro(s)</span>`}</div>

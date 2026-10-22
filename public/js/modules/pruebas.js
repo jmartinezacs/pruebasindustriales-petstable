@@ -402,8 +402,8 @@ function accionesHTML() {
   if (e === 'en_ejecucion' && puedeEn(P, 'responsable')) B('terminar', 'flag', 'Terminar prueba', 'navy');
   if (e === 'requiere_repeticion' && (puedeEn(P, 'preparar') || autoridad(P.tipo, 'dictaminar'))) B('nueva_ejecucion', 'repeat', 'Iniciar nueva ejecución', 'primary');
   b.push(`<button class="btn secondary" data-pa="imprimir">${icon('printer')} Expediente</button>`);
-  if (!CERRADAS.includes(e) && puedeEn(P, 'cancelar')) B('cancelar', 'ban', 'Cancelar prueba', 'ghost danger-text');
-  if (e === 'registrada' && (P.registrado_por === state.profile.id || state.isAdmin)) B('eliminar', 'trash-2', 'Eliminar', 'ghost danger-text');
+  if (!CERRADAS.includes(e) && puedeEn(P, 'cancelar')) B('cancelar', 'ban', 'Cancelar prueba', 'cancel-btn');
+  if (e === 'registrada' && (P.registrado_por === state.profile.id || state.isAdmin)) B('eliminar', 'trash-2', 'Eliminar', 'del-btn');
   return b.join('');
 }
 
@@ -558,7 +558,10 @@ async function tabSeguimiento(pane) {
     const f = e.target;
     if (!checkForm(f)) return;
     const b = f.querySelector('button[type=submit]'); if (b.disabled) return; b.disabled = true;
-    try { must(await sb.from('seguimiento_prubind').insert({ prueba_id: P.id, texto: f.elements.texto.value.trim(), tipo: 'nota' })); toast('Nota agregada.', 'success'); refrescar('seguimiento'); }
+    try {
+      const { data: nota } = must(await sb.from('seguimiento_prubind').insert({ prueba_id: P.id, texto: f.elements.texto.value.trim(), tipo: 'nota' }).select('id').single());
+      avisar('nota', P.id, { seguimiento_id: nota.id });   // aviso a todos los involucrados
+      toast('Nota agregada. Se avisó a los involucrados.', 'success'); refrescar('seguimiento'); }
     catch (err) { toast(errMsg(err), 'error'); b.disabled = false; }
   });
 }

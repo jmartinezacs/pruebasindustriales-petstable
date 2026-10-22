@@ -744,7 +744,8 @@ function csCerrar(enfocar = false) {
 function csUbicar(panel, anchor) {
   const r = anchor.getBoundingClientRect();
   const alto = Math.min(panel.scrollHeight, 300);
-  const abajo = innerHeight - r.bottom;
+  const vh = window.visualViewport?.height || innerHeight;   // sin contar el teclado del celular
+  const abajo = vh - r.bottom;
   panel.style.width = `${Math.max(r.width, 200)}px`;
   panel.style.left = `${Math.max(8, Math.min(r.left, innerWidth - 8 - Math.max(r.width, 200)))}px`;
   if (abajo < alto + 12 && r.top > abajo) { panel.style.top = ''; panel.style.bottom = `${innerHeight - r.top + 6}px`; }
@@ -783,7 +784,8 @@ function csAbrir(anchor, items, onPick) {
       const v = visibles(); hl = v.includes(hl) ? hl : (v[0] ?? -1); pintar();
     });
     buscador.addEventListener('keydown', (e) => csAbierto?.key(e));
-    setTimeout(() => buscador.focus(), 0);
+    // En celular y tableta no se enfoca solo: abrir el teclado redimensiona la pantalla y cerraba el menú
+    if (!tactil()) setTimeout(() => buscador.focus(), 0);
   }
   csAbierto = {
     panel, anchor,
@@ -813,8 +815,16 @@ function csAbrir(anchor, items, onPick) {
 document.addEventListener('mousedown', (e) => {
   if (csAbierto && !csAbierto.panel.contains(e.target) && !csAbierto.anchor.contains(e.target)) csCerrar();
 }, true);
-document.addEventListener('scroll', (e) => { if (csAbierto && !csAbierto.panel.contains(e.target)) csCerrar(); }, true);
-window.addEventListener('resize', () => csCerrar());
+// Mientras se escribe en el menú (o en un campo con sugerencias) el teclado del celular desplaza y
+// redimensiona la pantalla: en ese caso el menú se reacomoda en lugar de cerrarse
+const tactil = () => matchMedia('(pointer: coarse)').matches;
+const csEscribiendo = () => csAbierto && (csAbierto.panel.contains(document.activeElement) || document.activeElement === csAbierto.anchor);
+document.addEventListener('scroll', (e) => {
+  if (!csAbierto || csAbierto.panel.contains(e.target)) return;
+  if (csEscribiendo()) csUbicar(csAbierto.panel, csAbierto.anchor); else csCerrar();
+}, true);
+window.addEventListener('resize', () => { if (csEscribiendo()) csUbicar(csAbierto.panel, csAbierto.anchor); else csCerrar(); });
+window.visualViewport?.addEventListener('resize', () => { if (csEscribiendo()) csUbicar(csAbierto.panel, csAbierto.anchor); });
 document.addEventListener('keydown', (e) => { if (csAbierto && (e.target === csAbierto.anchor)) csAbierto.key(e); }, true);
 
 const valueDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
@@ -916,8 +926,8 @@ document.addEventListener('click', (e) => {
 // ---------- Avisos (notificaciones push) ----------
 // Se envían en segundo plano; si fallan no afectan la operación de la prueba.
 // La Edge Function valida que el evento sea real y elige a quién avisar.
-export function avisar(evento, pruebaId) {
-  try { sb.functions.invoke('notificar_prubind', { body: { accion: 'aviso', evento, prueba_id: pruebaId } }).catch(() => {}); } catch { /* sin conexión */ }
+export function avisar(evento, pruebaId, extra = {}) {
+  try { sb.functions.invoke('notificar_prubind', { body: { ...extra, accion: 'aviso', evento, prueba_id: pruebaId } }).catch(() => {}); } catch { /* sin conexión */ }
 }
 function b64uToUint8(s) {
   const pad = '='.repeat((4 - (s.length % 4)) % 4);

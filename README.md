@@ -415,3 +415,9 @@ Migración `20261021002200_prubind_v53_pendientes_hechos.sql`.
 - La lista de pruebas muestra al responsable asignado (antes salía quien registró).
 - Código de parámetros consecutivo `PAR-001`, `PAR-002`… (se asigna al crear y no cambia); migración `20261022003000_prubind_v59_codigo_par.sql`.
 - Tablas con las acciones siempre en un renglón.
+
+## v5.10 · Menús en celular, avisos de notas y botones (22/10/2026)
+- Menús con búsqueda en celular y tableta: ya no se enfoca solo el cuadro de búsqueda (el teclado cerraba el menú) y, mientras se escribe, el menú se reacomoda en lugar de cerrarse.
+- Materias primas sin campo "Código".
+- Botones "Cancelar prueba" (ámbar con borde) y "Eliminar" (rojo suave) distintos; "Sí hay algo que evaluar" como botón; "¿Cómo se cuantifica?" con dos tarjetas.
+- Nota en Seguimiento → aviso push a los involucrados (quien registró, responsable, responsables de las áreas con parámetros y quien haya registrado algo en la prueba). Edge Function `notificar_prubind` v3 con el evento `nota`; migración `20261022003100_prubind_v510_aviso_notas.sql`.

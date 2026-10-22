@@ -1002,3 +1002,29 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
 .table td.actions .row-actions { flex-wrap: nowrap; }
 .table td.actions { white-space: nowrap; width: 1%; }
 .table td .mono, .table td b.mono { white-space: nowrap; }
+
+/* v5.10 · Botones de cancelar / eliminar y opciones de cuantificación */
+.btn.cancel-btn { background: var(--card); color: #B54708; border: 1.5px solid #F2B266; }
+.btn.cancel-btn:hover { background: #FFF4E5; border-color: #E8892B; }
+.btn.del-btn { background: #FDECEC; color: #C2262E; border: 1.5px solid #F4B4B7; }
+.btn.del-btn:hover { background: #FBD9DA; border-color: #E0464E; }
+:root[data-theme="dark"] .btn.cancel-btn { background: rgba(232, 137, 43, .08); color: #F5B36B; border-color: rgba(232, 137, 43, .45); }
+:root[data-theme="dark"] .btn.del-btn { background: rgba(224, 70, 78, .12); color: #FF8A8F; border-color: rgba(224, 70, 78, .45); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn.cancel-btn { background: rgba(232, 137, 43, .08); color: #F5B36B; border-color: rgba(232, 137, 43, .45); }
+  :root:not([data-theme="light"]) .btn.del-btn { background: rgba(224, 70, 78, .12); color: #FF8A8F; border-color: rgba(224, 70, 78, .45); }
+}
+.cuanti-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cuanti-opt { position: relative; display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; border: 1.5px solid var(--line);
+  background: var(--card); cursor: pointer; transition: border-color .15s, box-shadow .15s, background .15s; }
+.cuanti-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.co-ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--soft); color: var(--muted); flex: 0 0 auto; }
+.co-ico svg { width: 19px; height: 19px; }
+.co-txt { display: grid; gap: 1px; min-width: 0; }
+.co-txt b { font-size: 13.5px; }
+.co-txt small { font-size: 11.5px; color: var(--muted); }
+.cuanti-opt:has(input:checked) { border-color: var(--turq); background: var(--turq-soft); box-shadow: 0 0 0 3px rgba(27, 199, 199, .15); }
+.cuanti-opt:has(input:checked) .co-ico { background: var(--turq); color: #fff; }
+.cuanti-opt:has(input:focus-visible) { outline: 2px solid var(--turq); outline-offset: 2px; }
+@media (max-width: 420px) { .cuanti-opts { grid-template-columns: 1fr; } }
+.field .cuanti-opts .cuanti-opt { display: flex; flex-direction: row; align-items: center; margin: 0; font-size: inherit; font-weight: 600; color: var(--text); }
