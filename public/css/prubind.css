@@ -1028,3 +1028,8 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
 .cuanti-opt:has(input:focus-visible) { outline: 2px solid var(--turq); outline-offset: 2px; }
 @media (max-width: 420px) { .cuanti-opts { grid-template-columns: 1fr; } }
 .field .cuanti-opts .cuanti-opt { display: flex; flex-direction: row; align-items: center; margin: 0; font-size: inherit; font-weight: 600; color: var(--text); }
+
+/* ---------- Portal Pet's Table (theme-init.js pone .en-portal) ---------- */
+.portal-btn { text-decoration: none; }
+html:not(.en-portal) .portal-btn { display: none !important; }
+.side-portal { margin-bottom: 8px; background: rgba(27, 199, 199, .1); color: #7FE3E3; }

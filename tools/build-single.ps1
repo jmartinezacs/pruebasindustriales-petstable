@@ -93,7 +93,7 @@ function Swap([string]$find, [string]$repl) {
 }
 Swap '  <link rel="icon" href="/favicon.ico?v=1" sizes="any">' "  <meta http-equiv=`"Content-Security-Policy`" content=`"$csp`">`n  <link rel=`"icon`" type=`"image/png`" sizes=`"64x64`" href=`"$fav64`">"
 Swap "  <link rel=`"icon`" type=`"image/png`" sizes=`"64x64`" href=`"/icons/favicon-64.png?v=4`">`n" ''
-Swap '  <link rel="manifest" href="/manifest.webmanifest?v=1">' '  <link rel="manifest" href="/manifest.webmanifest">'
+Swap '  <link rel="manifest" href="manifest.webmanifest?v=1">' '  <link rel="manifest" href="manifest.webmanifest">'
 Swap '<img class="app-icon" src="/img/app-icon-128.png"' "<img class=`"app-icon`" src=`"$icon128`""
 Swap "  <link rel=`"stylesheet`" href=`"/css/app.css?v=2.0.0`">`n  <link rel=`"stylesheet`" href=`"/css/prubind.css?v=2.0.0`">" "  <style>`n$css</style>"
 Swap '  <script src="/js/theme-init.js"></script>' "  <script>$themeJs</script>"

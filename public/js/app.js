@@ -4,6 +4,7 @@
 import {
   sb, state, prefs, esc, icon, refreshIcons, toast, errMsg, openModal, checkForm,
   destroyCharts, APP_VERSION, TZ, navigate, avatarHTML, restyleCharts, autoridadAlguna, push,
+  BASE, EN_PORTAL, K_REMEMBER, K_THEME,
 } from './core.js';
 import dashboard from './modules/dashboard.js';
 import pruebas, { openRegistro } from './modules/pruebas.js';
@@ -71,6 +72,8 @@ async function loadProfileAndStart() {
     if (error) throw error;
     const p = data?.[0];
     if (!p) {
+      // Dentro del portal la sesión es la del portal: no se cierra, se vuelve al tablero con aviso
+      if (EN_PORTAL) { location.replace('/#/inicio?sin=pruebas-industriales'); return; }
       await sb.auth.signOut({ scope: 'local' });
       showLogin('Tu cuenta no tiene acceso a Pruebas industriales o está inactiva. Solicítalo a un administrador.');
       return;
@@ -97,7 +100,7 @@ function showLogin(message) {
   if (message) { msg.textContent = message; msg.className = 'login-msg error'; } else { msg.className = 'login-msg hidden'; }
   const btn = $('#login-submit'); btn.disabled = false;
   btn.innerHTML = `${icon('log-in')} Entrar`;
-  $('#login-remember').checked = prefs.get('prubind.remember') !== '0';
+  $('#login-remember').checked = prefs.get(K_REMEMBER) !== '0';
   refreshIcons();
 }
 
@@ -112,7 +115,7 @@ let nuevaVersion = false;
 async function revisarVersion() {
   if (nuevaVersion || !navigator.onLine || document.hidden) return;
   try {
-    const r = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' });
+    const r = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
     if (!r.ok) return;
     const { version } = await r.json();
     if (version && version !== APP_VERSION) {
@@ -330,10 +333,10 @@ function startClock() {
 }
 
 // ---------------- Tema ----------------
-function currentTheme() { return prefs.get('prubind.theme') || 'system'; }
+function currentTheme() { return prefs.get(K_THEME) || 'system'; }
 export function setTheme(t) {
-  if (t === 'light' || t === 'dark') { document.documentElement.setAttribute('data-theme', t); prefs.set('prubind.theme', t); }
-  else { document.documentElement.removeAttribute('data-theme'); prefs.del('prubind.theme'); }
+  if (t === 'light' || t === 'dark') { document.documentElement.setAttribute('data-theme', t); prefs.set(K_THEME, t); }
+  else { document.documentElement.removeAttribute('data-theme'); prefs.del(K_THEME); }
   updateThemeButton();
   // Solo re-colorea las gráficas (sin volver a cargar la vista): cambio inmediato
   setTimeout(restyleCharts, 30);
@@ -368,7 +371,7 @@ async function login(e) {
   const btn = $('#login-submit');
   if (btn.disabled) return;
   btn.disabled = true; btn.innerHTML = '<span class="spinner sm"></span> Verificando…';
-  prefs.set('prubind.remember', $('#login-remember').checked ? '1' : '0');
+  prefs.set(K_REMEMBER, $('#login-remember').checked ? '1' : '0');
   const { error } = await sb.auth.signInWithPassword({
     email: form.email.value.trim().toLowerCase(),
     password: form.password.value,
@@ -391,6 +394,8 @@ async function logout() {
   await push.desvincular().catch(() => {});
   // scope "local": cierra solo esta sesión (otras apps de Pet's Table comparten la cuenta)
   await sb.auth.signOut({ scope: 'local' });
+  // Dentro del portal se cierra la sesión del portal: se vuelve a su inicio de sesión
+  if (EN_PORTAL) { location.replace('/'); return; }
   state.profile = null; state.session = null;
   history.replaceState(null, '', location.pathname);
   showLogin();
@@ -408,7 +413,7 @@ async function forgotPassword() {
       <p class="hint">Esta contraseña es la misma de tu cuenta Pet's Table en las demás aplicaciones.</p>`,
     onSubmit: async ({ form }) => {
       if (!checkForm(form, { email: (v) => (/@petstable\.mx$/i.test(v) ? '' : 'Usa tu correo @petstable.mx.') })) return false;
-      const { error } = await sb.auth.resetPasswordForEmail(form.email.value.trim().toLowerCase(), { redirectTo: `${location.origin}/` });
+      const { error } = await sb.auth.resetPasswordForEmail(form.email.value.trim().toLowerCase(), { redirectTo: `${location.origin}${BASE}` });
       if (error) throw error;
       toast('Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.', 'success', 7000);
     },

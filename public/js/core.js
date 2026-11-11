@@ -5,6 +5,12 @@
 const cfg = window.PRUBIND_CONFIG || {};
 export const TZ = 'America/Mexico_City';
 export const APP_VERSION = cfg.APP_VERSION || '1.0.0';
+// Dentro del Portal Pet's Table (theme-init.js lo detecta) la app vive en /pruebas-industriales/ y comparte
+// con el portal la sesión, «Mantener sesión» y el tema; sola, en /, conserva sus llaves de siempre.
+export const BASE = window.APP_BASE || '/';
+export const EN_PORTAL = !!window.APP_PORTAL;
+export const K_REMEMBER = EN_PORTAL ? 'portal.remember' : 'prubind.remember';
+export const K_THEME = EN_PORTAL ? 'portal.theme' : 'prubind.theme';
 
 // ---------- Almacenamiento de sesión ("Mantener sesión") ----------
 function safe(fn, fallback) { try { return fn(); } catch { return fallback; } }
@@ -15,7 +21,7 @@ export const prefs = {
 };
 const memory = new Map();
 function activeStore() {
-  const remember = prefs.get('prubind.remember') !== '0';
+  const remember = prefs.get(K_REMEMBER) !== '0';
   return safe(() => (remember ? window.localStorage : window.sessionStorage), null);
 }
 const authStorage = {
@@ -28,7 +34,7 @@ if (!window.supabase || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
   throw new Error('Configuración de Supabase no disponible.');
 }
 export const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: authStorage, storageKey: 'prubind-auth' },
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: authStorage, storageKey: EN_PORTAL ? 'portal-auth' : 'prubind-auth' },
 });
 
 // ---------- Sesión y permisos (ayuda visual; el servidor valida todo) ----------
@@ -934,6 +940,12 @@ function b64uToUint8(s) {
   const raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
+// Registro del service worker de esta app (alcance / sola, /pruebas-industriales/ en el portal). getRegistration
+// devolvería el del portal si el de la app aún no existe, por eso se compara el alcance.
+export async function registroPropio() {
+  const reg = await navigator.serviceWorker.getRegistration(BASE);
+  return reg && reg.scope === location.origin + BASE ? reg : null;
+}
 export const push = {
   soportado: () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext,
   esIOS: () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
@@ -941,7 +953,7 @@ export const push = {
   instalada: () => window.matchMedia('(display-mode: standalone), (display-mode: fullscreen), (display-mode: window-controls-overlay)').matches || window.navigator.standalone === true,
   async suscripcion() {
     if (!push.soportado()) return null;
-    const reg = await navigator.serviceWorker.getRegistration('/');
+    const reg = await registroPropio();
     return reg ? reg.pushManager.getSubscription() : null;
   },
   // 'no-soportado' | 'instalar' (iOS sin instalar) | 'bloqueado' | 'activo' | 'inactivo'
@@ -963,7 +975,7 @@ export const push = {
     if (!push.soportado()) throw new Error('Este navegador no admite notificaciones.');
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') throw new Error('No se concedió el permiso de notificaciones.');
-    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    const reg = await navigator.serviceWorker.register('sw.js', { scope: './' });
     await navigator.serviceWorker.ready;
     let { data: pub } = await sb.rpc('prubind_vapid_publica');
     if (!pub) {

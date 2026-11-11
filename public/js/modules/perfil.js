@@ -4,7 +4,7 @@
 // =====================================================================
 import {
   sb, state, esc, icon, refreshIcons, toast, errMsg, checkForm, prefs, fmtDateTime, APP_VERSION, avatarHTML, ACCIONES,
-  getCat, push, pill,
+  getCat, push, pill, K_THEME,
 } from '../core.js';
 
 // Estado y control de las notificaciones push de este dispositivo
@@ -37,7 +37,7 @@ async function pintarNotificaciones(box) {
         return;
       }
       await reg.showNotification('Aviso de prueba · Pruebas industriales', {
-        body: 'Así se verán los avisos de las pruebas en este dispositivo.', icon: '/notif-icon.png', badge: '/notif-badge.png', actions: [{ action: 'ver', title: 'Ver ahora' }],
+        body: 'Así se verán los avisos de las pruebas en este dispositivo.', icon: 'notif-icon.png', badge: 'notif-badge.png', actions: [{ action: 'ver', title: 'Ver ahora' }],
         tag: `prueba-${Date.now()}`, renotify: true, requireInteraction: true, silent: false, vibrate: [300, 120, 300, 120, 500], data: { url: '/#/perfil' },
       });
     } catch (err) { toast(errMsg(err), 'error'); }
@@ -59,7 +59,7 @@ export default {
   async render(el) {
     const p = state.profile;
     const user = state.session?.user;
-    const theme = prefs.get('prubind.theme') || 'system';
+    const theme = prefs.get(K_THEME) || 'system';
     const standalone = push.instalada();
     let tipos = [];
     try { tipos = await getCat('tipos'); } catch { /* se muestran los códigos */ }
