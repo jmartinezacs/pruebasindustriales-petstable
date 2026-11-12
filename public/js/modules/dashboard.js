@@ -6,7 +6,7 @@
 import {
   sb, state, esc, icon, refreshIcons, todayISO, addDays, fmtDate, fmtDateTime, fmtNum, pill, makeChart, destroyCharts, toast, errMsg,
   emptyState, errorState, navigate, monthShort, prefs, must, avatarHTML, estadoPill, prioPill, ESTADOS_PRUEBA, ABIERTAS, ACCIONES, AREAS,
-  temaOscuro, colorCategoria, push,
+  temaOscuro, paletaCat, push, kpiHTML, animarCifras, emoji,
 } from '../core.js';
 import { openRegistro, etapasMini } from './pruebas.js';
 
@@ -106,7 +106,7 @@ async function load() {
   if (!body) return;
   const [desde, hasta] = periodRange(root.querySelector('#dash-period').value, root.querySelector('#dash-desde').value, root.querySelector('#dash-hasta').value);
   if (!desde || !hasta || hasta < desde) { body.innerHTML = emptyState({ ico: 'calendar-x', title: 'Periodo inválido', text: 'La fecha final debe ser igual o posterior a la inicial.' }); refreshIcons(); return; }
-  if (!body.children.length) body.innerHTML = `<div class="grid grid-4">${'<div class="kpi"><div class="skeleton" style="width:60%"></div><div class="skeleton" style="height:30px;width:40%"></div></div>'.repeat(4)}</div>`;
+  if (!body.children.length) body.innerHTML = `<div class="kx-grid">${kxSkeleton.repeat(4)}</div>`;
   try {
     const res = await Promise.all([
       sb.rpc('prubind_dashboard', { p_desde: desde, p_hasta: hasta }),
@@ -121,6 +121,7 @@ async function load() {
     body.innerHTML = kpisHTML(k) + '<section class="card mt pend-card" id="dash-pend"></section>' + chartsHTML(k) + actividadHTML(act) + accesoHTML();
     pintarPendientes();
     refreshIcons();
+    animarCifras(body);
     drawCharts(k);
   } catch (err) {
     if (t !== token) return;
@@ -129,17 +130,18 @@ async function load() {
   }
 }
 
-const kpi = (cls, ico, label, value, desc, go = '') => `<div class="kpi ${cls} ${go ? 'clickable' : ''}" ${go ? `data-dash="${go}" role="link" tabindex="0"` : ''}>
-  <div class="kpi-head"><span class="kpi-ico">${icon(ico)}</span><small>${esc(label)}</small></div><strong>${fmtNum(value)}</strong><span class="desc">${esc(desc)}</span></div>`;
+// Indicador del Panel: componente único .kx (mismo destino de clic con data-dash)
+const kpi = (tono, ilus, ico, label, value, desc, go = '') => kpiHTML({ tono, ilus, ico, label, valor: fmtNum(value), desc, go, attr: 'data-dash' });
+const kxSkeleton = '<div class="kx kx-skel"><span class="skeleton" style="width:55%"></span><span class="skeleton" style="height:32px;width:38%"></span><span class="skeleton" style="width:70%"></span></div>';
 
 function kpisHTML(k) {
   const a = k.actual || {};
   const abiertas = ABIERTAS.reduce((s, e) => s + (a[e] || 0), 0);
-  return `<div class="grid grid-4">
-    ${kpi('k-green i-green', 'flask-conical', 'Pruebas abiertas', abiertas, 'Sin cerrar ni cancelar', '#/pruebas?estado=abiertas')}
-    ${kpi('k-yellow i-yellow', 'factory', 'En proceso', a.en_ejecucion || 0, 'Iniciadas, con registro de las áreas', '#/pruebas?estado=en_ejecucion')}
-    ${kpi('k-orange i-orange', 'gavel', 'Pendientes de dictamen', a.pendiente_dictamen || 0, 'Las áreas ya dieron su veredicto', '#/pruebas?estado=pendiente_dictamen')}
-    ${kpi('k-blue i-blue', 'archive', 'Pruebas cerradas', (a.cerrada_aprobada || 0) + (a.cerrada_rechazada || 0), `${a.cerrada_aprobada || 0} aprobada(s) · ${a.cerrada_rechazada || 0} rechazada(s)`, '#/pruebas?estado=cerradas')}
+  return `<div class="kx-grid">
+    ${kpi('green', 'pruebas', 'flask-conical', 'Pruebas abiertas', abiertas, 'Sin cerrar ni cancelar', '#/pruebas?estado=abiertas')}
+    ${kpi('orange', 'en_curso', 'factory', 'En proceso', a.en_ejecucion || 0, 'Iniciadas, con registro de las áreas', '#/pruebas?estado=en_ejecucion')}
+    ${kpi('violet', 'dictamen', 'gavel', 'Pendientes de dictamen', a.pendiente_dictamen || 0, 'Las áreas ya dieron su veredicto', '#/pruebas?estado=pendiente_dictamen')}
+    ${kpi('blue', 'aprobada', 'archive', 'Pruebas cerradas', (a.cerrada_aprobada || 0) + (a.cerrada_rechazada || 0), `${a.cerrada_aprobada || 0} aprobada(s) · ${a.cerrada_rechazada || 0} rechazada(s)`, '#/pruebas?estado=cerradas')}
   </div>`;
 }
 
@@ -173,7 +175,7 @@ function pintarPendientes() {
     </article>`;
   };
   const filtros = Object.keys(ACC).filter((k) => conteo[k]);
-  cont.innerHTML = `<div class="card-head center"><div><h3>${icon('hand')} Requieren tu intervención</h3><p>${porPrueba.size ? `${PEND.length} acción(es) en ${porPrueba.size} prueba(s)` : 'Según tu puesto'}</p></div>
+  cont.innerHTML = `<div class="card-head center"><div><h3>${emoji('n_avisos', 'h-ilus')} Requieren tu intervención</h3><p>${porPrueba.size ? `${PEND.length} acción(es) en ${porPrueba.size} prueba(s)` : 'Según tu puesto'}</p></div>
       <button class="btn primary" data-dash="nueva">${icon('flask-conical')} Nueva prueba</button></div>
     ${filtros.length > 1 ? `<div class="pend-filtros" role="tablist">${[['todas', 'Todas', PEND.length], ...filtros.map((k) => [k, ACC[k][2], conteo[k]])]
       .map(([k, l, n]) => `<button type="button" role="tab" class="pf ${filtroPend === k ? 'on' : ''}" data-dash="filtro" data-f="${k}" aria-selected="${filtroPend === k}">${k !== 'todas' ? icon(ACC[k][1]) : ''}${esc(l)} <b>${n}</b></button>`).join('')}</div>` : ''}
@@ -184,7 +186,7 @@ function pintarPendientes() {
 }
 
 // ---------- Gráficas ----------
-const chartCard = (id, title, sub, cls = '', total = '') => `<div class="card chart-card"><div class="chart-head"><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}${total !== '' ? `<span class="chart-total">${total}</span>` : ''}</div><div class="chart-box ${cls}"><canvas id="${id}" role="img" aria-label="${esc(title)}"></canvas></div></div>`;
+const chartCard = (id, title, sub, cls = '', total = '') => `<div class="card chart-card"><div class="chart-head"><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}${total !== '' ? `<span class="chart-total">${total}</span>` : ''}</div><div class="chart-box ${cls}" tabindex="0" title="Ampliar gráfica"><canvas id="${id}" role="img" aria-label="${esc(title)}"></canvas></div></div>`;
 function chartsHTML(k) {
   const hayActual = Object.values(k.actual || {}).some((n) => n > 0);
   if (!k.registradas && !hayActual) return `<div class="card mt">${emptyState({ ico: 'bar-chart-3', title: 'Aún no hay pruebas', text: 'Las gráficas aparecerán al registrar pruebas.' })}</div>`;
@@ -214,7 +216,7 @@ function actividadHTML(act) {
   const SEG = { nota: ['message-square', 'Nota'], estado: ['flag', 'Cambio de etapa'], sistema: ['cpu', 'Sistema'] };
   const grupos = [];
   act.forEach((s) => { const d = diaDe(s.created_at); if (!grupos.length || grupos[grupos.length - 1][0] !== d) grupos.push([d, []]); grupos[grupos.length - 1][1].push(s); });
-  return `<section class="card mt"><div class="card-head center"><div><h3>${icon('activity')} Actividad reciente</h3><p>Notas del equipo y avances de las pruebas</p></div></div>
+  return `<section class="card mt"><div class="card-head center"><div><h3>${emoji('n_bitacora', 'h-ilus')} Actividad reciente</h3><p>Notas del equipo y avances de las pruebas</p></div></div>
     ${act.length ? `<div class="feed">${grupos.map(([d, xs]) => `<div class="feed-day"><span>${esc(d)}</span></div>
       <ol class="feed-list">${xs.map((s) => `<li><button type="button" class="feed-item t-${esc(s.tipo)}" data-dash="#/pruebas?id=${esc(s.prueba_id)}&tab=seguimiento">
         <span class="feed-av">${s.usuario ? avatarHTML(s.usuario, s.foto_url, 'sm') : `<span class="feed-sys">${icon('cpu')}</span>`}<span class="feed-badge">${icon(SEG[s.tipo]?.[0] || 'dot')}</span></span>
@@ -246,32 +248,38 @@ const SITUACION = [['En curso', (e) => !['cerrada_aprobada', 'cerrada_rechazada'
 const ETAPA_DE = [['Registradas', ['registrada', 'en_preparacion', 'preparada']], ['En proceso', ['en_ejecucion']],
   ['En evaluación', ['en_evaluacion', 'pendiente_resultados']], ['Pendientes de dictamen', ['pendiente_dictamen', 'requiere_repeticion']], ['Por cerrar', ['aprobada', 'rechazada']]];
 function drawCharts(k) {
-  const o = temaOscuro() ? 1 : 0;
-  const ce = (n) => ESTADO_COL[n][o];
+  // Colores por tema: cada serie guarda una función (_colores) para repintarse al cambiar entre claro y oscuro
+  const ce = (n) => () => ESTADO_COL[n][temaOscuro() ? 1 : 0];
+  const cat = (i) => () => paletaCat()[i % 8];
+  const cats = (n) => () => Array.from({ length: n }, (_, i) => paletaCat()[i % 8]);
   // Sin abreviaturas: "Octubre 2026" por mes; "20/10/2026" por día
   const fmtP = (p) => (k.por_mes ? `${MESES[Number(p.slice(5, 7)) - 1]} ${p.slice(0, 4)}` : `${p.slice(8, 10)}/${p.slice(5, 7)}/${p.slice(0, 4)}`);
   const s = k.serie || [];
   // Dos series: un color categórico por serie
   makeChart(document.getElementById('ch-serie'), { type: 'bar', data: { labels: s.map((x) => fmtP(x.periodo)), datasets: [
-    { label: 'Registradas', data: s.map((x) => x.registradas), backgroundColor: colorCategoria(0), maxBarThickness: 34, categoryPercentage: 0.72, barPercentage: 0.92 },
-    { label: 'Cerradas', data: s.map((x) => x.cerradas), backgroundColor: colorCategoria(1), maxBarThickness: 34, categoryPercentage: 0.72, barPercentage: 0.92 }] },
+    { label: 'Registradas', data: s.map((x) => x.registradas), _colores: cat(0), maxBarThickness: 34, categoryPercentage: 0.72, barPercentage: 0.92 },
+    { label: 'Cerradas', data: s.map((x) => x.cerradas), _colores: cat(1), maxBarThickness: 34, categoryPercentage: 0.72, barPercentage: 0.92 }] },
     options: { plugins: { legend: { position: 'top', align: 'center' } } } });
   const a = k.actual || {};
   const sit = SITUACION.map(([l, f, col]) => [l, Object.entries(a).filter(([e]) => f(e)).reduce((t, [, n]) => t + n, 0), col]).filter(([, n]) => n > 0);
+  const totalSit = sit.reduce((t, [, n]) => t + n, 0);
+  // Dona con la cifra total al centro; los colores de estado se conservan
   makeChart(document.getElementById('ch-estado'), { type: 'doughnut', data: { labels: sit.map(([l]) => l),
-    datasets: [{ data: sit.map(([, n]) => n), backgroundColor: sit.map(([, , col]) => ce(col)) }] },
-    options: { plugins: { legend: { position: 'bottom' }, etiquetas: { centro: 'Pruebas' } } } });
+    datasets: [{ data: sit.map(([, n]) => n), _colores: () => sit.map(([, , col]) => ce(col)()), _centro: { valor: fmtNum(totalSit), etiqueta: 'Pruebas' } }] },
+    options: { plugins: { legend: { position: 'bottom' } } } });
   // Una barra por categoría: cada una con su color (en orden fijo de la paleta)
   const et = ETAPA_DE.map(([l, es]) => [l, es.reduce((t, e) => t + (a[e] || 0), 0)]);
   makeChart(document.getElementById('ch-etapa'), { type: 'bar', data: { labels: et.map(([l]) => l), datasets: [{ label: 'Pruebas', data: et.map(([, n]) => n),
-    backgroundColor: et.map((_, i) => colorCategoria(i)), maxBarThickness: 24 }] }, options: { indexAxis: 'y', plugins: { legend: { display: false } } } });
-  const pt = (k.por_tipo || []).filter((x) => x.n > 0);
+    _colores: cats(et.length), maxBarThickness: 24 }] }, options: { indexAxis: 'y', plugins: { legend: { display: false } } } });
+  // Más de 8 tipos: el resto se agrupa en «Otros» (la paleta no se repite)
+  let pt = (k.por_tipo || []).filter((x) => x.n > 0).sort((x, y) => y.n - x.n);
+  if (pt.length > 8) pt = [...pt.slice(0, 7), { tipo: 'Otros', n: pt.slice(7).reduce((t, x) => t + x.n, 0) }];
   makeChart(document.getElementById('ch-tipo'), { type: 'bar', data: { labels: pt.map((x) => x.tipo), datasets: [{ label: 'Pruebas', data: pt.map((x) => x.n),
-    backgroundColor: pt.map((_, i) => colorCategoria(i)), maxBarThickness: 24 }] }, options: { indexAxis: 'y', plugins: { legend: { display: false } } } });
+    _colores: cats(pt.length), maxBarThickness: 24 }] }, options: { indexAxis: 'y', plugins: { legend: { display: false } } } });
   const ea = (k.evaluaciones_por_area || []).filter((x) => x.cumple || x.no_cumple || x.no_determinado);
   makeChart(document.getElementById('ch-areas'), { type: 'bar', data: { labels: ea.map((x) => AREAS[x.area]?.label || x.area), datasets: [
-    { label: 'Cumple', data: ea.map((x) => x.cumple), backgroundColor: ce('cumple'), maxBarThickness: 28 },
-    { label: 'No cumple', data: ea.map((x) => x.no_cumple), backgroundColor: ce('no_cumple'), maxBarThickness: 28 },
-    { label: 'No se pudo determinar', data: ea.map((x) => x.no_determinado || 0), backgroundColor: ce('no_determinado'), etiquetaColor: '#1f1a0a', maxBarThickness: 28 }] },
+    { label: 'Cumple', data: ea.map((x) => x.cumple), _colores: ce('cumple'), maxBarThickness: 28 },
+    { label: 'No cumple', data: ea.map((x) => x.no_cumple), _colores: ce('no_cumple'), maxBarThickness: 28 },
+    { label: 'No se pudo determinar', data: ea.map((x) => x.no_determinado || 0), _colores: ce('no_determinado'), etiquetaColor: '#1f1a0a', maxBarThickness: 28 }] },
     options: { indexAxis: 'y', scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { legend: { position: 'top', align: 'center' } } } });
 }

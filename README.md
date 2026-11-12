@@ -421,3 +421,12 @@ Migración `20261021002200_prubind_v53_pendientes_hechos.sql`.
 - Materias primas sin campo "Código".
 - Botones "Cancelar prueba" (ámbar con borde) y "Eliminar" (rojo suave) distintos; "Sí hay algo que evaluar" como botón; "¿Cómo se cuantifica?" con dos tarjetas.
 - Nota en Seguimiento → aviso push a los involucrados (quien registró, responsable, responsables de las áreas con parámetros y quien haya registrado algo en la prueba). Edge Function `notificar_prubind` v3 con el evento `nota`; migración `20261022003100_prubind_v510_aviso_notas.sql`.
+
+## v5.12 · Sistema visual de Ruta de calidad (11/11/2026)
+- Solo diseño: sin cambios en la base de datos, RPC, Edge Functions, permisos ni flujos de las pruebas.
+- **Ilustraciones propias** (SVG de 64 × 64 en `public/emoji/`, generadas con `perl tools/gen-ilustraciones.pl fuentes/ilustraciones.src public/emoji`): menú, dock, títulos de cada vista, indicadores, secciones del expediente, estado de cada prueba, Mi perfil y estados vacíos y de error. Los botones, campos y acciones de tabla conservan sus íconos lucide.
+- **Dock móvil flotante** (≤ 720 px) con Panel, Pruebas, Recetas, Usuarios y Perfil.
+- **Indicadores** con `kpiHTML()` (`.kx`) y cifras animadas (`animarCifras()`); **gráficas** con degradados, etiquetas dentro de la barra o en píldora, dona con la cifra al centro, paleta categórica `paletaCat()` y **gráfica ampliada** con exportación PNG (`ampliarGrafica()`).
+- **Mi perfil** con tarjeta de identidad, mosaicos, sistema y versión, tarjeta de notificaciones (`.avisos`) y créditos.
+- Superficies `--hero-*` con diseño propio en claro y oscuro; entrada suave de cada vista y barra de carga entre vistas; todo se apaga con «reducir movimiento».
+- Notificaciones: la insignia de Android (`notif-badge.png` y `notif-badge-192.png`, `purpose: monochrome`) es la silueta del logotipo de Pet's Table; ícono opaco de 180 px para iPhone (`apple-touch-icon-180.png`).

@@ -4,28 +4,35 @@
 // =====================================================================
 import {
   sb, state, esc, icon, refreshIcons, toast, errMsg, checkForm, prefs, fmtDateTime, APP_VERSION, avatarHTML, ACCIONES,
-  getCat, push, pill, K_THEME,
+  getCat, push, K_THEME, emoji,
 } from '../core.js';
 
-// Estado y control de las notificaciones push de este dispositivo
+// Créditos de la plataforma (la fotografía es la de su cuenta, desde el directorio de usuarios)
+const AUTOR = { nombre: 'Javier Martínez González', cuenta: 'Javier Martínez' };
+// Mosaico de información: ilustración, etiqueta y valor
+const fila = (ilus, label, valor) => `<div class="pf-t"><span class="pf-ico">${emoji(ilus)}</span><div><small>${esc(label)}</small><b>${esc(valor)}</b></div></div>`;
+
+// Estado y control de las notificaciones push de este dispositivo (tarjeta .avisos)
+const ESTADO_AVISOS = { on: 'Notificaciones activadas', off: 'Notificaciones no disponibles', pend: 'Activa las notificaciones', info: 'Instala la app para recibirlas' };
 async function pintarNotificaciones(box) {
   if (!box) return;
   const est = await push.estado().catch(() => 'no-soportado');
   const quien = 'Te avisaremos cuando te toque hacer algo en una prueba.';
-  const txt = {
-    activo: [pill('Activadas', 'ok'), quien, `<div class="page-actions" style="justify-content:flex-start">
-        <button class="btn primary" data-n="test">${icon('bell-ring')} Enviar aviso de prueba</button>
-        <button class="btn secondary" data-n="off">${icon('bell-off')} Desactivar en este dispositivo</button></div>
-      <details class="notif-ajustes"><summary>${icon('smartphone')} ¿No suena o no aparece en la pantalla bloqueada?</summary>
+  const [estado, texto, acc, extra] = {
+    activo: ['on', quien, `<button class="btn primary sm" data-n="test">${icon('bell-ring')} Enviar aviso de prueba</button>
+        <button class="btn secondary sm" data-n="off">${icon('bell-off')} Desactivar</button>`,
+      `<details class="notif-ajustes"><summary>${icon('smartphone')} ¿No suena o no aparece en la pantalla bloqueada?</summary>
         <p><b>Android (Chrome):</b> mantén presionado el aviso de prueba → Configuración, o ve a Ajustes → Aplicaciones → Chrome → Notificaciones → busca este sitio y activa <b>Mostrar en pantalla emergente</b>, <b>Sonido</b> y <b>Pantalla de bloqueo</b>. Revisa también que “No molestar” esté apagado.</p>
         <p><b>iPhone:</b> Ajustes → Notificaciones → Pruebas industriales → activa <b>Permitir notificaciones</b>, <b>Pantalla bloqueada</b>, <b>Tiras</b> (estilo “Persistente”) y <b>Sonidos</b>. Revisa que el modo Concentración no lo silencie.</p>
       </details>`],
-    inactivo: [pill('Desactivadas', 'gray'), quien, `<button class="btn primary" data-n="on">${icon('bell')} Activar notificaciones</button>`],
-    bloqueado: [pill('Bloqueadas', 'bad'), 'Las notificaciones están bloqueadas para este sitio. Permítelas desde la configuración del navegador (ícono del candado junto a la dirección) y vuelve a intentarlo.', ''],
-    instalar: [pill('Requiere instalar', 'warn'), 'En iPhone/iPad las notificaciones solo funcionan con la app instalada: toca Compartir → “Agregar a pantalla de inicio”, ábrela desde ese ícono y regresa aquí para activarlas.', ''],
-    'no-soportado': [pill('No disponibles', 'gray'), 'Este navegador no admite notificaciones web. Usa Chrome, Edge o Safari actualizados.', ''],
+    inactivo: ['pend', quien, `<button class="btn primary sm" data-n="on">${icon('bell')} Activar notificaciones</button>`, ''],
+    bloqueado: ['off', 'Las notificaciones están bloqueadas para este sitio. Permítelas desde la configuración del navegador (ícono del candado junto a la dirección) y vuelve a intentarlo.', '', ''],
+    instalar: ['info', 'En iPhone/iPad las notificaciones solo funcionan con la app instalada: toca Compartir → “Agregar a pantalla de inicio”, ábrela desde ese ícono y regresa aquí para activarlas.', '', ''],
+    'no-soportado': ['off', 'Este navegador no admite notificaciones web. Usa Chrome, Edge o Safari actualizados.', '', ''],
   }[est];
-  box.innerHTML = `<p style="margin:0 0 8px">${txt[0]}</p><p class="hint" style="margin:0 0 10px">${esc(txt[1])}</p>${txt[2]}`;
+  const titulo = est === 'bloqueado' ? 'Notificaciones bloqueadas' : ESTADO_AVISOS[estado];
+  box.innerHTML = `<div class="avisos ${estado}"><span class="avisos-ico">${emoji('n_avisos')}</span>
+      <div class="avisos-txt"><b>${titulo}</b><p>${esc(texto)}</p></div>${acc ? `<div class="avisos-acc">${acc}</div>` : ''}</div>${extra}`;
   refreshIcons();
   box.querySelector('[data-n="test"]')?.addEventListener('click', async () => {
     // Aviso local con las mismas opciones que los avisos reales (vibración, permanece en pantalla)
@@ -70,23 +77,26 @@ export default {
     }).filter(Boolean);
     el.innerHTML = `
       <section class="page-intro"><div><span class="eyebrow">Cuenta</span><h1>Mi perfil</h1><p>Tus datos de acceso, autoridades y preferencias.</p></div></section>
-      <section class="profile-hero">
-        <div class="access-photo">${avatarHTML(p.nombre, p.foto_url, 'xl')}<span class="access-check">${icon('badge-check')}</span></div>
-        <div>
-          <span class="access-badge">${icon(p.rol === 'admin' ? 'crown' : 'user')} ${p.rol === 'admin' ? 'Administrador' : 'Usuario'}</span>
+      <div class="pf-grid">
+        <section class="pf-id">
+          <div class="pf-foto">${avatarHTML(p.nombre, p.foto_url, 'xl')}<span class="pf-verif" aria-hidden="true">${icon('badge-check')}</span></div>
+          <span class="pf-rol ${p.rol === 'admin' ? 'admin' : ''}">${icon(p.rol === 'admin' ? 'crown' : 'user-round')} ${p.rol === 'admin' ? 'Administrador' : 'Usuario'}</span>
           <h2>${esc(p.nombre)}</h2>
-          <p class="puesto">${esc(p.puesto || 'Puesto no registrado')}</p>
-          <span class="mail">${icon('mail')} ${esc(p.email)}</span>
+          <p class="pf-puesto">${esc(p.puesto || 'Puesto no registrado')}</p>
+          <span class="pf-mail">${icon('mail')} ${esc(p.email)}</span>
+        </section>
+        <div class="pf-info">
+          <section class="pf-bloque"><h3 class="pf-sec">${icon('briefcase')} Información laboral</h3>
+            <div class="pf-tiles t2">${fila('gafete', 'Puesto', p.puesto || 'Sin puesto asignado')}${fila('personas', 'Área', p.area || 'Sin área')}</div></section>
+          <section class="pf-bloque"><h3 class="pf-sec">${icon('shield-check')} Acceso</h3>
+            <div class="pf-tiles t2">${fila('llave', 'Permisos', p.rol === 'admin' ? 'Administración de catálogos, recetas, plantillas y usuarios; registrar y consultar pruebas' : 'Registrar y consultar pruebas; actuar según tus autoridades')}${fila('reloj', 'Último acceso', fmtDateTime(user?.last_sign_in_at))}</div></section>
+          <section class="pf-bloque"><h3 class="pf-sec">${icon('bell')} Notificaciones en este dispositivo</h3><div id="notif-box"><div class="skeleton" style="height:64px"></div></div></section>
+          <section class="pf-sistema"><span class="brand-logo pf-logo" aria-hidden="true"></span>
+            <div><small>Pruebas industriales</small><b>Calidad de proceso <i aria-hidden="true">|</i> <span>Pet's Table</span></b></div>
+            <span class="pf-ver"><small>Versión</small><b>${esc(APP_VERSION)}</b></span></section>
         </div>
-      </section>
-      <div class="profile-tiles mt">
-        <div class="p-tile"><span class="ti">${icon('building-2')}</span><small>Área</small><b>${esc(p.area || 'Sin área')}</b></div>
-        <div class="p-tile"><span class="ti">${icon('shield-check')}</span><small>Permisos</small><b>${p.rol === 'admin' ? 'Administración de catálogos, recetas, plantillas y usuarios; registrar y consultar pruebas' : 'Registrar y consultar pruebas; actuar según tus autoridades'}</b></div>
-        <div class="p-tile"><span class="ti">${icon('briefcase')}</span><small>Puesto</small><b>${esc(p.puesto || 'Sin puesto asignado')}</b></div>
-        <div class="p-tile"><span class="ti">${icon('clock')}</span><small>Último acceso</small><b>${fmtDateTime(user?.last_sign_in_at)}</b></div>
-        <div class="p-tile"><span class="ti">${icon('info')}</span><small>Versión del sistema</small><b>${esc(APP_VERSION)}</b></div>
       </div>
-      <div class="card mt"><div class="card-head"><div><h3>Tus autoridades</h3><p>Además, siempre puedes registrar pruebas y preparar las que registraste o tienes asignadas.</p></div></div>
+      <div class="card mt"><div class="card-head"><div><h3>${emoji('llave', 'h-ilus')}Tus autoridades</h3><p>Además, siempre puedes registrar pruebas y preparar las que registraste o tienes asignadas.</p></div></div>
         ${p.rol === 'admin' ? `<div class="notice">${icon('crown')}<span>Como <b>administrador</b> puedes realizar todas las acciones de las autoridades (definir, registrar, evaluar y dar veredicto por cualquier área, dictaminar y cerrar), por ejemplo para hacer pruebas o apoyar a un responsable.</span></div>` : ''}
         ${aut.length ? `<div class="list">${aut.map((a) => `<div class="list-item"><span class="pend-ico">${icon('key-round')}</span><div class="li-main"><b>${esc(a.lbl)}</b><span>${esc(a.tipos)}</span></div></div>`).join('')}</div>`
           : `<p class="hint">${p.puesto ? 'Tu puesto no tiene autoridades asignadas.' : 'Aún no tienes puesto asignado.'} Un administrador las configura en Usuarios › Autoridades.</p>`}</div>
@@ -111,8 +121,6 @@ export default {
             <button data-theme-opt="dark" class="${theme === 'dark' ? 'active' : ''}">${icon('moon')} Oscuro</button>
             <button data-theme-opt="system" class="${theme === 'system' ? 'active' : ''}">${icon('monitor-smartphone')} Sistema</button>
           </div>
-          <div class="section-title" style="margin-top:22px">${icon('bell-ring')} Notificaciones en este dispositivo</div>
-          <div id="notif-box"><div class="skeleton" style="height:36px"></div></div>
           <div class="section-title" style="margin-top:22px">${icon('smartphone')} Instalar en la pantalla de inicio</div>
           ${standalone ? `<p class="hint">${icon('check-circle-2')} Ya estás usando la aplicación instalada.</p>` : `
           <button class="btn secondary hidden" id="install-btn">${icon('download')} Instalar aplicación</button>
@@ -121,8 +129,26 @@ export default {
           <p class="hint" style="margin:10px 0 6px"><b>Android (Chrome):</b></p>
           <ol class="steps"><li>Abre el menú <b>⋮</b>.</li><li>Elige <b>Instalar aplicación</b> o <b>Agregar a pantalla principal</b>.</li></ol>`}
         </div>
-      </div>`;
+      </div>
+      <section class="cr mt" aria-labelledby="cr-t">
+        <div class="cr-foto" id="cr-foto">${avatarHTML(AUTOR.nombre, null, 'xl')}</div>
+        <div class="cr-cuerpo">
+          <span class="cr-eyebrow">${icon('sparkles')} Desarrollado por</span>
+          <h3 id="cr-t">${esc(AUTOR.nombre)}</h3>
+          <p class="cr-rol">Creador y desarrollador de la plataforma</p>
+          <p class="cr-txt">Concibió, diseñó, desarrolló e implementó Pruebas industriales: el flujo de las pruebas por etapas, la base de datos y sus permisos, los avisos y la experiencia en escritorio y móvil.</p>
+          <ul class="cr-etapas" aria-label="Participación"><li>Conceptualización</li><li>Diseño</li><li>Desarrollo</li><li>Implementación</li></ul>
+        </div>
+        <figure class="cr-firma"><span class="cr-firma-img" role="img" aria-label="Firma de ${esc(AUTOR.nombre)}"></span>
+          <figcaption><b>${esc(AUTOR.nombre)}</b><small>Autor de la plataforma</small></figcaption></figure>
+      </section>`;
     refreshIcons();
+    // Fotografía del autor: la de su cuenta (directorio de usuarios)
+    getCat('usuarios').then((us) => {
+      const a = us.find((u) => u.nombre === AUTOR.cuenta && u.foto_url);
+      const caja = el.querySelector('#cr-foto');
+      if (a && caja) caja.innerHTML = avatarHTML(AUTOR.nombre, a.foto_url, 'xl');
+    }).catch(() => { /* sin fotografía */ });
 
     el.querySelectorAll('[data-theme-opt]').forEach((b) => b.addEventListener('click', () => {
       window.__prubindSetTheme?.(b.dataset.themeOpt);

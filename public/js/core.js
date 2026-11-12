@@ -193,6 +193,48 @@ export const icon = (name, cls = '') => `<i data-lucide="${name}"${cls ? ` class
 export const ayuda = (texto) => `<span class="help" tabindex="0" role="note" aria-label="${esc(texto)}" data-tip="${esc(texto)}">${icon('circle-help')}</span>`;
 export function refreshIcons() { try { window.lucide?.createIcons(); } catch { /* sin íconos */ } }
 
+// ---------- Ilustraciones propias (public/emoji, generadas desde fuentes/ilustraciones.src) ----------
+// Ruta relativa: funciona sola en / y dentro del Portal en /pruebas-industriales/. Decorativas (alt vacío).
+export const emoji = (slug, cls = '') => `<img class="emoji ${cls}" src="emoji/${slug}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">`;
+// Ilustración de cada estado de la prueba y de cada etapa del expediente
+export const ILUS_ESTADO = {
+  registrada: 'calendario', en_preparacion: 'calendario', preparada: 'calendario', en_ejecucion: 'en_curso',
+  en_evaluacion: 'evaluacion', pendiente_resultados: 'evaluacion', pendiente_dictamen: 'dictamen', requiere_repeticion: 'evaluacion',
+  aprobada: 'aprobada', rechazada: 'rechazada', cerrada_aprobada: 'aprobada', cerrada_rechazada: 'rechazada', cancelada: 'cancelada',
+};
+export const ILUS_ETAPA = { registro: 'registro', proceso: 'cocimiento', resultados: 'evaluacion', recomendaciones: 'criterios', dictamen: 'dictamen', cierre: 'folio' };
+
+// ---------- Indicadores (.kx) ----------
+// tono: orange, green, red, blue o violet. ilus: ilustración (si no, ícono lucide ico).
+// texto: el valor es una palabra. barra: porcentaje 0 a 100. go: ruta al pulsar (data-dash en el Panel).
+export function kpiHTML({ tono, ico = 'circle', ilus = '', label, valor, desc = '', go = '', texto = false, barra = null, attr = 'data-go' }) {
+  const link = go ? ` ${attr}="${esc(go)}" role="link" tabindex="0"` : '';
+  return `<div class="kx t-${tono}${texto ? ' texto' : ''}${go ? ' go' : ''}"${link}>
+    <span class="kx-ico${ilus ? ' ilus-box' : ''}" aria-hidden="true">${ilus ? emoji(ilus) : icon(ico)}</span>
+    <div class="kx-top"><small>${esc(label)}</small></div>
+    <strong${texto ? '' : ' data-cifra'} title="${esc(valor)}">${esc(valor)}</strong>${desc ? `<span class="kx-desc">${esc(desc)}</span>` : ''}
+    ${barra !== null ? `<span class="kx-barra" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, barra))}%"></i></span>` : ''}
+    ${go ? `<span class="kx-go">Ver detalle ${icon('arrow-right')}</span>` : ''}</div>`;
+}
+// Las cifras cuentan desde 0 (1,832 · 95.0% · 6.4%), en formato es-MX. Sin animación si el usuario la reduce.
+export function animarCifras(raiz) {
+  if (!raiz || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  raiz.querySelectorAll('[data-cifra]').forEach((el) => {
+    const m = el.textContent.trim().match(/^([\d,]+)(\.\d+)?(%?)$/);
+    if (!m) return;
+    const fin = Number(`${m[1].replace(/,/g, '')}${m[2] || ''}`), dec = m[2] ? m[2].length - 1 : 0, suf = m[3];
+    if (!fin) return;
+    const fmt = new Intl.NumberFormat('es-MX', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    const t0 = performance.now(), dur = 900;
+    const paso = (t) => {
+      const k = Math.min(1, (t - t0) / dur), e = 1 - (1 - k) ** 3;
+      el.textContent = `${fmt.format(fin * e)}${suf}`;
+      if (k < 1 && el.isConnected) requestAnimationFrame(paso);
+    };
+    requestAnimationFrame(paso);
+  });
+}
+
 export function sanitizeSearch(q) { return String(q || '').replace(/[%,()*\\"'`;:]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60); }
 export function debounce(fn, ms = 300) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 
@@ -395,11 +437,17 @@ export function bindCounters(root) {
 }
 
 // ---------- Estados vacíos ----------
+// Ilustración de los estados vacíos según el ícono pedido (los demás conservan su ícono lucide)
+const ILUS_VACIO = {
+  'book-open': 'libro', 'calendar-x': 'calendario', history: 'n_bitacora', 'list-checks': 'criterios', 'search-x': 'buscar_vacio', 'wifi-off': 'sin_conexion',
+  inbox: 'paquete', 'bar-chart-3': 'n_panel', 'check-circle-2': 'activo', users: 'personas', 'flask-conical': 'pruebas', package: 'paquete', factory: 'cocimiento',
+};
 export function emptyState({ ico = 'inbox', title, text = '', action = '' }) {
-  return `<div class="empty"><div class="empty-ico">${icon(ico)}</div><b>${esc(title)}</b>${text ? `<p>${esc(text)}</p>` : ''}${action}</div>`;
+  const ilus = ILUS_VACIO[ico];
+  return `<div class="empty"><div class="empty-ico${ilus ? ' ilus' : ''}">${ilus ? emoji(ilus) : icon(ico)}</div><b>${esc(title)}</b>${text ? `<p>${esc(text)}</p>` : ''}${action}</div>`;
 }
 export function errorState(err, retryAction = 'retry') {
-  return `<div class="empty error"><div class="empty-ico">${icon('wifi-off')}</div><b>No se pudo cargar la información</b><p>${esc(errMsg(err))}</p>
+  return `<div class="empty error"><div class="empty-ico ilus">${emoji('sin_conexion')}</div><b>No se pudo cargar la información</b><p>${esc(errMsg(err))}</p>
     <button class="btn secondary" data-action="${retryAction}">${icon('refresh-cw')} Reintentar</button></div>`;
 }
 
@@ -503,119 +551,223 @@ export function paged(q, { from, to, sort }, extraOrder = []) {
 }
 
 // ---------- Gráficas ----------
+// Sistema visual de Ruta de calidad: barras con degradado, dona con cifra al centro,
+// etiquetas dentro de la barra (o en píldora si no caben), tooltip oscuro y gráfica ampliada.
 const charts = new Set();
+const chartConfigs = new WeakMap();
 export function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 // ¿Tema oscuro? (para elegir los tonos validados de cada modo)
-export const temaOscuro = () => (cssVar('--card') || '#ffffff').toLowerCase() !== '#ffffff';
+export const temaOscuro = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
 const fmtEtiqueta = (v) => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 1 }).format(v);
 // Paleta categórica validada (daltonismo y contraste) para claro y oscuro: un color por
-// categoría, siempre en el mismo orden; máximo 8 categorías por gráfica.
-const PALETA = {
-  claro: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'],
-  oscuro: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'],
+// categoría, siempre en el mismo orden; máximo 8 categorías por gráfica (el resto, «Otros»).
+const PALETA_CAT = {
+  claro: ['#2A78D6', '#EB6834', '#1BAF7A', '#EDA100', '#E87BA4', '#008300', '#6250D6', '#E34948'],
+  oscuro: ['#3987E5', '#D95926', '#199E70', '#C98500', '#D55181', '#008300', '#9085E9', '#E66767'],
 };
-export const colorCategoria = (i) => PALETA[temaOscuro() ? 'oscuro' : 'claro'][i % 8];
+export const paletaCat = () => PALETA_CAT[temaOscuro() ? 'oscuro' : 'claro'];
+export const colorCategoria = (i) => paletaCat()[i % 8];
 
-// Etiquetas de datos: valor al final de cada barra (dentro del segmento si es apilada)
-// y dentro de cada porción de la dona, con el total al centro.
-const etiquetasPlugin = {
-  id: 'etiquetas',
-  afterDatasetsDraw(chart, _args, opts) {
-    if (opts?.display === false) return;
+// Etiqueta de datos: el valor dentro de cada barra o segmento (en píldora si no cabe).
+// Se dibuja en el canvas, así que también aparece al guardar la gráfica como imagen.
+const etiquetasDatos = {
+  id: 'prubindEtiquetas',
+  afterDatasetsDraw(chart) {
+    const tipo = chart.config.type;
+    if (!['bar', 'doughnut', 'pie'].includes(tipo)) return;
     const { ctx } = chart;
-    const text = cssVar('--text') || '#172431';
-    const dona = chart.config.type === 'doughnut';
-    const horizontal = chart.options.indexAxis === 'y';
-    const apilada = !dona && !!(chart.options.scales?.x?.stacked || chart.options.scales?.y?.stacked);
+    const horiz = chart.options.indexAxis === 'y';
     ctx.save();
-    ctx.font = '700 12px Inter, Segoe UI, system-ui, sans-serif';
-    ctx.textBaseline = 'middle';
+    ctx.font = `800 ${chart.canvas.dataset.zoom ? 15 : 11}px Inter, Segoe UI, system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     chart.data.datasets.forEach((ds, di) => {
       const meta = chart.getDatasetMeta(di);
       if (meta.hidden || meta.type === 'line') return;
-      const total = dona ? ds.data.reduce((s, v) => s + (Number(v) || 0), 0) : 0;
       meta.data.forEach((el, i) => {
         const v = Number(ds.data[i]);
-        if (!v || (dona && !chart.getDataVisibility(i))) return;
-        const txt = fmtEtiqueta(v);
-        const w = ctx.measureText(txt).width;
-        if (dona) {
-          if (v / total < 0.05) return;
-          const p = el.tooltipPosition();
-          ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
-          ctx.fillText(txt, p.x, p.y);
-        } else if (apilada) {
-          const largo = horizontal ? Math.abs(el.x - el.base) : Math.abs(el.base - el.y);
-          if (largo < w + 10) return;
-          const p = el.getCenterPoint();
-          ctx.fillStyle = ds.etiquetaColor || '#ffffff'; ctx.textAlign = 'center';
-          ctx.fillText(txt, p.x, p.y);
-        } else if (horizontal) {
-          ctx.fillStyle = text; ctx.textAlign = 'left';
-          ctx.fillText(txt, el.x + 6, el.y);
+        if (!v || el.hidden || (tipo !== 'bar' && !chart.getDataVisibility(i))) return;
+        // _porcentaje: el segmento muestra su proporción del total (pastel y dona)
+        const total = ds._porcentaje ? ds.data.reduce((s, n) => s + Number(n || 0), 0) : 0;
+        const label = ds._porcentaje ? `${fmtEtiqueta((v / total) * 100)} %` : `${fmtEtiqueta(v)}${ds._sufijo || ''}`;
+        let x, y, dentro = true;
+        if (tipo === 'bar') {
+          const p = el.getProps(['x', 'y', 'base'], true);
+          const largo = horiz ? Math.abs(p.x - p.base) : Math.abs(p.base - p.y);
+          const ancho = ctx.measureText(label).width + 6;
+          dentro = largo >= (horiz ? ancho : 16);
+          // Barras apiladas: si no cabe, no se repite fuera (se lee en el recuadro de información)
+          if (!dentro && ds.stack !== undefined) return;
+          if (!dentro && chart.options.scales?.x?.stacked) return;
+          if (dentro) { x = horiz ? (p.x + p.base) / 2 : p.x; y = horiz ? p.y : (p.y + p.base) / 2; }
+          else { x = horiz ? p.x + ancho / 2 + 8 : p.x; y = horiz ? p.y : p.y - 13; }
         } else {
-          ctx.fillStyle = text; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-          ctx.fillText(txt, el.x, el.y - 4);
-          ctx.textBaseline = 'middle';
+          if (el.circumference < 0.12) return;
+          // Dona con cifra al centro: el segmento dominante no repite la cifra
+          if (ds._centro && el.circumference > Math.PI * 1.6) return;
+          ({ x, y } = el.tooltipPosition(true));
+        }
+        if (dentro) {
+          if (ds.etiquetaColor) ctx.fillStyle = ds.etiquetaColor;
+          else { ctx.shadowColor = 'rgba(9, 13, 18, .45)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1; ctx.fillStyle = '#FFFFFF'; }
+          ctx.fillText(label, x, y);
+          ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+        } else {
+          // Fuera de la barra: píldora con el color de la tarjeta y borde del color de la barra
+          const w = ctx.measureText(label).width + 12, h = chart.canvas.dataset.zoom ? 22 : 18;
+          const col = colorDe(ds._color, i) || cssVar('--muted');
+          ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
+          ctx.fillStyle = cssVar('--card') || '#fff'; ctx.fill();
+          ctx.lineWidth = 1.5; ctx.strokeStyle = typeof col === 'string' ? col : '#94A3B8'; ctx.stroke();
+          ctx.fillStyle = cssVar('--text') || '#172431';
+          ctx.fillText(label, x, y + .5);
         }
       });
     });
-    // Total al centro de la dona
-    if (dona && opts?.centro) {
-      const meta = chart.getDatasetMeta(0); const arc = meta.data[0];
-      if (arc) {
-        const total = chart.data.datasets[0].data.reduce((s, v) => s + (Number(v) || 0), 0);
-        ctx.textAlign = 'center'; ctx.fillStyle = text;
-        ctx.font = '800 26px Inter, Segoe UI, system-ui, sans-serif';
-        ctx.fillText(fmtEtiqueta(total), arc.x, arc.y - 8);
-        ctx.font = '600 11.5px Inter, Segoe UI, system-ui, sans-serif'; ctx.fillStyle = cssVar('--muted') || '#687B8C';
-        ctx.fillText(opts.centro, arc.x, arc.y + 14);
-      }
+    ctx.restore();
+  },
+};
+// Color hexadecimal → rgba (para degradados); otros formatos se devuelven igual
+export function rgba(hex, a = 1) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+// Mezcla con blanco (0–1): tono claro del mismo color para el degradado de las barras
+function aclarar(hex, k) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return hex;
+  const n = parseInt(m[1], 16), f = (c) => Math.round(c + (255 - c) * k);
+  return `rgb(${f((n >> 16) & 255)}, ${f((n >> 8) & 255)}, ${f(n & 255)})`;
+}
+const colorDe = (col, i) => (Array.isArray(col) ? col[i % col.length] : col);
+// Barras: degradado del color pleno (extremo de la barra) a un tono más claro (base)
+function degradadoBarra(c, col, horiz) {
+  const base = colorDe(col, c.dataIndex);
+  const area = c.chart.chartArea;
+  if (!area || typeof base !== 'string' || !base.startsWith('#')) return base;
+  const g = horiz ? c.chart.ctx.createLinearGradient(area.left, 0, area.right, 0) : c.chart.ctx.createLinearGradient(0, area.bottom, 0, area.top);
+  g.addColorStop(0, aclarar(base, 0.4));
+  g.addColorStop(1, base);
+  return g;
+}
+// Líneas: área bajo la curva que se desvanece hacia abajo
+function degradadoArea(c, col) {
+  const area = c.chart.chartArea;
+  if (!area || typeof col !== 'string') return rgba(col, 0.12);
+  const g = c.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+  g.addColorStop(0, rgba(col, 0.26));
+  g.addColorStop(1, rgba(col, 0));
+  return g;
+}
+// Dona: cifra principal al centro (dataset._centro = { valor, etiqueta, color })
+const centroDona = {
+  id: 'prubindCentro',
+  afterDatasetsDraw(chart) {
+    const ds = chart.data.datasets[0];
+    if (chart.config.type !== 'doughnut' || !ds?._centro) return;
+    const arco = chart.getDatasetMeta(0).data.find((a) => a && !a.hidden);
+    if (!arco) return;
+    const { x, y, innerRadius } = arco.getProps(['x', 'y', 'innerRadius'], true);
+    const zoom = !!chart.canvas.dataset.zoom;
+    const t = Math.max(14, Math.min(innerRadius * 0.42, zoom ? 46 : 30));
+    const { ctx } = chart;
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `900 ${t}px Inter, Segoe UI, system-ui, sans-serif`;
+    ctx.fillStyle = ds._centro.color || cssVar('--text') || '#172431';
+    ctx.fillText(ds._centro.valor, x, y - (ds._centro.etiqueta ? t * 0.3 : 0));
+    if (ds._centro.etiqueta) {
+      ctx.font = `700 ${Math.max(10, t * 0.38)}px Inter, Segoe UI, system-ui, sans-serif`;
+      ctx.fillStyle = cssVar('--muted') || '#687B8C';
+      ctx.fillText(ds._centro.etiqueta, x, y + t * 0.6);
     }
     ctx.restore();
   },
 };
+// Aplica el color del tema a cada serie: _colores() devuelve los colores del tema activo
+function aplicarColores(d) {
+  if (typeof d._colores !== 'function') return;
+  const col = d._colores();
+  d._color = col;
+  if (!d._grad) d.backgroundColor = col;
+}
 
 export function makeChart(canvas, config) {
   if (!window.Chart || !canvas) return null;
-  const muted = cssVar('--muted') || '#687B8C', line = cssVar('--line') || '#E3EAEF', text = cssVar('--text') || '#172431', card = cssVar('--card') || '#ffffff';
+  const muted = cssVar('--muted') || '#687B8C', line = cssVar('--line') || '#E3EAEF', text = cssVar('--text') || '#172431';
   window.Chart.defaults.font.family = 'Inter, Segoe UI, system-ui, sans-serif';
   window.Chart.defaults.color = muted;
-  const dona = config.type === 'doughnut';
-  const horizontal = config.options?.indexAxis === 'y';
+  const horiz = config.options?.indexAxis === 'y';
+  const tipo = config.type;
   const apilada = !!(config.options?.scales?.x?.stacked || config.options?.scales?.y?.stacked);
-  // Marcas: esquinas de 4 px y 2 px de separación (color de la superficie) entre rellenos
-  (config.data?.datasets || []).forEach((ds) => {
-    if (dona) Object.assign(ds, { borderWidth: 2, borderColor: card, hoverOffset: 6, ...ds });
-    else if ((ds.type || config.type) === 'bar') Object.assign(ds, { borderRadius: 4, borderSkipped: apilada ? false : 'start', ...(apilada ? { borderWidth: horizontal ? { right: 2 } : { top: 2 }, borderColor: card } : {}), ...ds });
-    // Separación con el color de la superficie: se repinta al cambiar entre modo claro y oscuro
-    if (ds.borderColor === card) ds._separador = true;
+  config.data.datasets.forEach((d) => {
+    aplicarColores(d);
+    // Pastel y dona: la separación entre segmentos toma el color de la tarjeta (sin bordes blancos en modo oscuro)
+    if (['pie', 'doughnut'].includes(tipo)) {
+      d.borderColor = cssVar('--card') || '#fff'; d._bordeTarjeta = true;
+      d.borderWidth = 3; d.hoverOffset = 8;
+      if (tipo === 'doughnut') d.borderRadius = 6;
+      return;
+    }
+    // Barras con degradado (el color base se guarda en _color: la gráfica ampliada copia los datos como JSON)
+    if ((d.type || tipo) === 'bar') {
+      if (d._color === undefined) d._color = d.backgroundColor;
+      d._grad = true;
+      d.backgroundColor = (c) => degradadoBarra(c, d._color, horiz);
+      d.hoverBackgroundColor = (c) => colorDe(d._color, c.dataIndex);
+      d.borderRadius = apilada ? 4 : 8;
+      d.borderSkipped = apilada ? 'middle' : 'start';
+      return;
+    }
+    // Línea principal: área sombreada bajo la curva y puntos con aro del color de la tarjeta
+    if ((d.type || tipo) === 'line' && d._area) {
+      if (d._color === undefined) d._color = d.borderColor;
+      const col = d._color;
+      d.fill = 'start';
+      d.backgroundColor = (c) => degradadoArea(c, col);
+      d.pointBorderColor = cssVar('--card') || '#fff'; d._bordeTarjeta = true;
+      d.pointBorderWidth = 2;
+    }
   });
-  const valor = horizontal ? 'x' : 'y', categoria = horizontal ? 'y' : 'x';
-  const ejes = dona ? {} : {
-    [categoria]: { grid: { display: false }, ticks: { color: muted, precision: 0, font: { weight: 600 } }, border: { display: false }, stacked: apilada },
-    // Los valores van como etiqueta sobre cada barra: el eje numérico sobra
-    [valor]: { display: false, grid: { color: line, drawTicks: false }, ticks: { color: muted, precision: 0 }, beginAtZero: true, stacked: apilada, grace: '14%' },
-  };
+  const chico = (canvas.parentElement?.clientWidth || canvas.clientWidth || 600) < 420; // celular: menos marcas y letra compacta
+  const ejes = { grid: { color: line, drawTicks: false, lineWidth: 1 }, ticks: { color: muted, precision: 0, padding: chico ? 6 : 8, maxTicksLimit: chico ? 5 : 8, font: { size: chico ? 10.5 : 11, weight: '500' } }, border: { display: false } };
+  const ox = config.options?.scales?.x || {}, oy = config.options?.scales?.y || {};
   const c = new window.Chart(canvas, {
     ...config,
-    plugins: [etiquetasPlugin, ...(config.plugins || [])],
+    plugins: [...(config.plugins || []), etiquetasDatos, centroDona],
     options: {
-      responsive: true, maintainAspectRatio: false, animation: { duration: 450, easing: 'easeOutQuart' },
-      layout: { padding: dona ? 6 : { top: horizontal ? 4 : 18, right: horizontal ? 34 : 8 } },
-      interaction: { mode: dona ? 'nearest' : 'index', intersect: dona },
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 750, easing: 'easeOutCubic' },
+      transitions: { active: { animation: { duration: 160 } } },
+      interaction: config.options?.interaction || (['doughnut', 'pie'].includes(tipo) ? { mode: 'nearest', intersect: true } : { mode: 'index', intersect: false }),
+      layout: config.options?.layout || { padding: { top: 12, right: 10, bottom: 2, left: 4 } },
       plugins: {
-        legend: { labels: { color: text, boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: 'circle', padding: 14, font: { weight: 600 } }, ...(config.options?.plugins?.legend || {}) },
-        tooltip: { backgroundColor: '#0D1B26', titleColor: '#EEF3F7', bodyColor: '#EEF3F7', padding: 12, cornerRadius: 10, boxPadding: 4, usePointStyle: true,
-          callbacks: dona ? { label: (it) => { const t = it.dataset.data.reduce((s, v) => s + (Number(v) || 0), 0); return ` ${it.label}: ${fmtEtiqueta(it.parsed)} (${t ? Math.round((it.parsed / t) * 100) : 0} %)`; } } : {} },
-        etiquetas: config.options?.plugins?.etiquetas || {},
+        legend: { labels: { color: text, boxWidth: 8, boxHeight: 8, usePointStyle: true, pointStyle: 'circle', padding: chico ? 12 : 16, font: { size: chico ? 11 : 12, weight: '600' } }, ...(config.options?.plugins?.legend || {}) },
+        tooltip: {
+          backgroundColor: 'rgba(10, 26, 39, .96)', titleColor: '#FFFFFF', bodyColor: '#D7E1EA', footerColor: '#93A5B3',
+          titleFont: { size: 12, weight: '700' }, bodyFont: { size: 12, weight: '500' }, titleMarginBottom: 6, bodySpacing: 4,
+          padding: { x: 12, y: 10 }, cornerRadius: 10, caretSize: 5, caretPadding: 8, boxPadding: 5, usePointStyle: true, animation: { duration: 140 },
+          borderColor: 'rgba(255, 255, 255, .14)', borderWidth: 1,
+          ...(['doughnut', 'pie'].includes(tipo) ? { callbacks: { label: (it) => { const t = it.dataset.data.reduce((s, v) => s + (Number(v) || 0), 0); return ` ${it.label}: ${fmtEtiqueta(it.parsed)} (${t ? Math.round((it.parsed / t) * 100) : 0} %)`; } } } : {}),
+          ...(config.options?.plugins?.tooltip || {}),
+        },
       },
-      scales: Object.fromEntries(Object.entries(ejes).map(([k, v]) => [k, { ...v, ...(config.options?.scales?.[k] || {}) }])),
-      ...(horizontal ? { indexAxis: 'y' } : {}),
-      ...(dona ? { cutout: '62%' } : {}),
+      scales: ['doughnut', 'pie'].includes(tipo) ? {} : {
+        x: { ...ejes, beginAtZero: horiz, ...ox, grid: { ...ejes.grid, display: horiz, ...(ox.grid || {}) }, ticks: { ...ejes.ticks, ...(ox.ticks || {}) } },
+        y: { ...ejes, beginAtZero: !horiz, ...oy, grid: { ...ejes.grid, display: !horiz, ...(oy.grid || {}) }, ticks: { ...ejes.ticks, ...(oy.ticks || {}) } },
+      },
+      ...(horiz ? { indexAxis: 'y' } : {}),
+      ...(tipo === 'doughnut' ? { cutout: '66%' } : {}),
     },
   });
   charts.add(c);
+  chartConfigs.set(c, config);
+  // El recuadro de información se oculta al salir de la gráfica (no se queda fijo)
+  const ocultar = () => { try { c.setActiveElements([]); c.tooltip?.setActiveElements([], { x: 0, y: 0 }); c.update('none'); } catch { /* gráfica destruida */ } };
+  canvas.addEventListener('mouseleave', ocultar);
+  canvas.addEventListener('pointerleave', ocultar);
+  canvas.addEventListener('blur', ocultar);
   return c;
 }
 // Cambio de tema inmediato: re-colorea las gráficas sin volver a consultar datos
@@ -624,9 +776,12 @@ export function restyleCharts() {
   charts.forEach((c) => {
     try {
       const o = c.options;
-      // Borde blanco en modo claro y del color de la tarjeta en oscuro (dona y barras apiladas)
-      c.data.datasets.forEach((ds) => { if (ds._separador) ds.borderColor = card; });
       if (o.plugins?.legend?.labels) o.plugins.legend.labels.color = text;
+      c.data.datasets.forEach((d) => {
+        aplicarColores(d);
+        if (!d._bordeTarjeta) return;
+        if (['pie', 'doughnut'].includes(c.config.type)) d.borderColor = card; else d.pointBorderColor = card;
+      });
       for (const s of Object.values(o.scales || {})) {
         if (s.ticks) s.ticks.color = muted;
         if (s.grid) s.grid.color = line;
@@ -636,6 +791,115 @@ export function restyleCharts() {
   });
 }
 export function destroyCharts() { charts.forEach((c) => { try { c.destroy(); } catch { /* ya destruida */ } }); charts.clear(); }
+
+// ---------- Gráfica ampliada ----------
+// Al tocar o hacer clic en una gráfica se abre sola, en grande, sobre un fondo
+// limpio (útil para tomar captura) y con la opción de guardarla como imagen.
+let zoomAbierto = null;
+export function ampliarGrafica(canvas) {
+  const orig = window.Chart?.getChart(canvas);
+  const config = orig && chartConfigs.get(orig);
+  if (!config || zoomAbierto) return;
+  const card = canvas.closest('.card');
+  const titulo = card?.querySelector('.chart-head h3, .card-head h3')?.textContent.trim() || canvas.getAttribute('aria-label') || 'Gráfica';
+  const sub = card?.querySelector('.chart-head p, .card-head p')?.textContent.trim() || '';
+  const total = card?.querySelector('.chart-total')?.textContent.replace(/\s+/g, ' ').trim() || '';
+  const ov = document.createElement('div');
+  ov.className = 'chart-zoom';
+  ov.setAttribute('role', 'dialog');
+  ov.setAttribute('aria-modal', 'true');
+  ov.setAttribute('aria-label', titulo);
+  ov.innerHTML = `
+    <div class="cz-card">
+      <div class="cz-head">
+        <div class="cz-tit"><h2>${esc(titulo)}</h2>${sub ? `<p>${esc(sub)}</p>` : ''}${total ? `<span class="chart-total">${esc(total)}</span>` : ''}</div>
+        <div class="cz-acts">
+          <button type="button" class="btn secondary" data-cz="png">${icon('image-down')} <span>Guardar imagen</span></button>
+          <button type="button" class="icon-btn" data-cz="cerrar" aria-label="Cerrar" title="Cerrar (Esc)">${icon('x')}</button>
+        </div>
+      </div>
+      <div class="cz-body"><canvas data-zoom="1" role="img" aria-label="${esc(titulo)}"></canvas></div>
+      <div class="cz-pie"><span>Pruebas industriales · Pet's Table</span><span class="cz-girar">${icon('smartphone')} Gira el teléfono para verla más grande</span></div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.classList.add('modal-open');
+  refreshIcons();
+  const cfg = { ...config, data: JSON.parse(JSON.stringify(config.data)) };
+  cfg.data.datasets?.forEach((d, i) => {
+    const o = config.data.datasets[i];
+    if (o?._colores) d._colores = o._colores;
+    if (d.maxBarThickness) d.maxBarThickness = Math.round(d.maxBarThickness * 1.8);
+  });
+  const zc = makeChart(ov.querySelector('canvas'), cfg);
+  charts.delete(zc);
+  // Letras más grandes en la vista ampliada
+  try {
+    for (const s of Object.values(zc.options.scales || {})) if (s.ticks) s.ticks.font = { size: 14, weight: '600' };
+    if (zc.options.plugins?.legend?.labels) zc.options.plugins.legend.labels.font = { size: 14 };
+    zc.update('none');
+  } catch { /* opciones no disponibles */ }
+  const cerrar = () => {
+    document.removeEventListener('keydown', onKey);
+    try { zc.destroy(); } catch { /* ya destruida */ }
+    ov.remove();
+    if (!document.querySelector('.modal')) document.body.classList.remove('modal-open');
+    zoomAbierto = null;
+    canvas.focus?.();
+  };
+  const onKey = (e) => { if (e.key === 'Escape') cerrar(); };
+  document.addEventListener('keydown', onKey);
+  ov.addEventListener('click', (e) => {
+    if (e.target === ov || e.target.closest('[data-cz="cerrar"]')) cerrar();
+    else if (e.target.closest('[data-cz="png"]')) guardarGrafica(zc, titulo, [sub, total].filter(Boolean).join(' · '));
+  });
+  zoomAbierto = cerrar;
+  ov.querySelector('[data-cz="cerrar"]').focus();
+}
+window.addEventListener('hashchange', () => zoomAbierto?.());
+
+// Imagen PNG con título, subtítulo y la gráfica sobre fondo sólido
+async function guardarGrafica(chart, titulo, sub) {
+  const src = chart.canvas, k = 2;
+  const w = src.width, h = src.height, pad = 24 * k, top = (sub ? 78 : 56) * k;
+  const c = document.createElement('canvas');
+  c.width = w + pad * 2; c.height = h + top + pad;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = cssVar('--card') || '#FFFFFF';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillStyle = cssVar('--text') || '#172431';
+  ctx.font = `800 ${22 * k}px Inter, Segoe UI, system-ui, sans-serif`;
+  ctx.textBaseline = 'top';
+  ctx.fillText(titulo, pad, pad);
+  if (sub) {
+    ctx.fillStyle = cssVar('--muted') || '#687B8C';
+    ctx.font = `500 ${14 * k}px Inter, Segoe UI, system-ui, sans-serif`;
+    ctx.fillText(sub, pad, pad + 32 * k);
+  }
+  ctx.drawImage(src, pad, top);
+  const nombre = `${titulo.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'grafica'}.png`;
+  const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+  if (!blob) { toast('No se pudo generar la imagen.', 'error'); return; }
+  const file = new File([blob], nombre, { type: 'image/png' });
+  // En celulares: compartir o guardar en fotos; en computadora: descarga directa
+  if (matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: titulo }); return; } catch (err) { if (err?.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: nombre });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  toast('Imagen de la gráfica guardada.', 'success');
+}
+// Clic o Enter sobre una gráfica: se abre ampliada
+document.addEventListener('click', (e) => {
+  const cv = e.target.closest('.chart-box')?.querySelector('canvas');
+  if (cv && !e.target.closest('.chart-zoom')) ampliarGrafica(cv);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || !e.target.matches?.('.chart-box')) return;
+  const cv = e.target.querySelector('canvas');
+  if (cv) ampliarGrafica(cv);
+});
 
 // ---------- Catálogos en caché ligera ----------
 // Definición de lectura de cada catálogo (tabla, columnas y orden)

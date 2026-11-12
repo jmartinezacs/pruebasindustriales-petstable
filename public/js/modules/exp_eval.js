@@ -11,7 +11,7 @@
 // =====================================================================
 import {
   sb, state, esc, icon, toast, errMsg, must, mustRow, getCat, unidadTxt, fmtDateTime, pill, puedeArea, misAreas, todayISO,
-  AREAS, AREAS_ORDEN, COMPLEMENTARIAS, OPCIONES_TXT, EVALUACION, VEREDICTO, refreshIcons,
+  AREAS, AREAS_ORDEN, COMPLEMENTARIAS, OPCIONES_TXT, EVALUACION, VEREDICTO, refreshIcons, emoji,
 } from '../core.js';
 import { aviso, vacio, checklist, accion, criterioTxt, campoValor, leerValor, payloadValor, eviChips } from './exp_comun.js';
 
@@ -242,7 +242,7 @@ export async function etapaRecomendaciones(pane, ctx) {
         ${noPart.length ? `<div class="card mt no-part"><div class="card-head"><div>${P.estado === 'en_ejecucion' ? '<h3>Áreas sin datos todavía</h3><p>Participan si registran algún dato.</p>'
           : '<h3>Áreas que no participaron</h3><p>No registraron datos.</p>'}</div></div>
           <div class="chips">${noPart.map((a) => `<span class="chip">${icon(AREAS[a].ico)} ${esc(AREAS[a].label)}</span>`).join('')}</div></div>` : ''}</div>
-      <div class="card"><div class="card-head"><div><h3>Para pasar a dictamen</h3><p>Pasa sola a dictamen cuando todas las áreas dan su veredicto.</p></div></div>
+      <div class="card"><div class="card-head"><div><h3>${emoji('dictamen', 'h-ilus')}Para pasar a dictamen</h3><p>Pasa sola a dictamen cuando todas las áreas dan su veredicto.</p></div></div>
         ${checklist([...(P.estado === 'en_ejecucion' ? [[false, 'Prueba terminada']] : []), ...part.map((a) => [listo(a), `Veredicto de ${AREAS[a].label}`])])}
         ${TERMINADA.includes(P.estado) && completo ? `<button class="btn violet block mt" data-rc="enviar">${icon('send')} Enviar a dictamen</button>` : ''}
       </div>

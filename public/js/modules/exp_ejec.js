@@ -9,7 +9,7 @@
 // =====================================================================
 import {
   sb, esc, icon, toast, errMsg, confirmDialog, must, getCat, fmtDate, todayISO, pill, puedeEn, puedeArea, misAreas,
-  AREAS, AREAS_ORDEN, refreshIcons, fechaEjecTxt, fechaFinDe,
+  AREAS, AREAS_ORDEN, refreshIcons, fechaEjecTxt, fechaFinDe, emoji,
 } from '../core.js';
 import { aviso, vacio } from './exp_comun.js';
 import { registroForm } from './exp_captura.js';
@@ -75,7 +75,7 @@ export async function etapaProceso(pane, ctx) {
   if (actual && ANTES.includes(P.estado)) {
     const inicia = puedeEn(P, 'responsable');
     pane.innerHTML = `<div class="card start-card">
-      <span class="start-ico">${icon('circle-play')}</span>
+      <span class="start-ico ilus">${emoji('en_curso')}</span>
       <h3>La prueba aún no inicia</h3>
       <p>${inicia ? 'Iníciela cuando esté lista; se avisará a las áreas.'
         : `${esc(P.responsable_inicial_nombre || P.registrado_por_nombre || 'El responsable')} (responsable) la iniciará.`}</p>
@@ -106,7 +106,7 @@ export async function etapaProceso(pane, ctx) {
     <div class="grid grid-main mt-s">
       <div>
         <div class="card reg-card">
-          <div class="card-head"><div><h3>Datos de la prueba</h3><p>Un solo formulario: cada parámetro va para toda la prueba o por ${noun}.</p></div>${selEjecucion(P, ej)}</div>
+          <div class="card-head"><div><h3>${emoji('captura', 'h-ilus')}Datos de la prueba</h3><p>Un solo formulario: cada parámetro va para toda la prueba o por ${noun}.</p></div>${selEjecucion(P, ej)}</div>
           ${items.length ? `
             <button type="button" class="reg-cta ${puede ? '' : 'ver'}" data-ej="registrar">
               <span class="reg-ico">${icon(puede ? 'clipboard-pen' : 'eye')}</span>
@@ -127,7 +127,7 @@ export async function etapaProceso(pane, ctx) {
           ${puedeEn(P, 'preparar') && P.fecha_planeada ? `<button class="link-btn" data-ej="fecha">${icon('calendar')} Cambiar fecha final</button>` : ''}
         </div>` : ''}
         <div class="card ${terminador ? 'mt' : ''}">
-          <div class="card-head"><div><h3>Participación por área</h3><p>Quién ya registró datos</p></div></div>
+          <div class="card-head"><div><h3>${emoji('personas', 'h-ilus')}Participación por área</h3><p>Quién ya registró datos</p></div></div>
           <div class="area-rows">${estadoAreas(P, E, items, D)}</div>
         </div>
       </div>

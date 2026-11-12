@@ -3,13 +3,14 @@
 // =====================================================================
 import {
   sb, state, esc, icon, toast, openModal, checkForm, nullIfEmpty, must, getCat, opciones,
-  ADJ_MAX_MB, ADJ_ACCEPT, rutaAdjunto, avisar, OPCIONES_TXT,
+  ADJ_MAX_MB, ADJ_ACCEPT, rutaAdjunto, avisar, OPCIONES_TXT, emoji,
 } from '../core.js';
 
 export const box = (l, v, full = false) => `<div class="info-box ${full ? 'full' : ''}"><small>${esc(l)}</small><div>${v}</div></div>`;
 export const txt = (s) => `<span style="white-space:pre-wrap">${esc(s || '—')}</span>`;
-export const cardHead = (title, sub = '', btns = '') =>
-  `<div class="card-head"><div><h3>${esc(title)}</h3>${sub ? `<p>${sub}</p>` : ''}</div>${btns ? `<div class="head-btns">${btns}</div>` : ''}</div>`;
+// ilus: ilustración opcional del encabezado de la sección (public/emoji)
+export const cardHead = (title, sub = '', btns = '', ilus = '') =>
+  `<div class="card-head"><div><h3>${ilus ? emoji(ilus, 'h-ilus') : ''}${esc(title)}</h3>${sub ? `<p>${sub}</p>` : ''}</div>${btns ? `<div class="head-btns">${btns}</div>` : ''}</div>`;
 export const btn = (attrs, ico, label, cls = 'secondary') => `<button class="btn ${cls}" ${attrs}>${icon(ico)} ${esc(label)}</button>`;
 export const iconBtn = (attrs, ico, title, cls = '') => `<button class="icon-btn ${cls}" ${attrs} title="${esc(title)}" aria-label="${esc(title)}">${icon(ico)}</button>`;
 export const aviso = (msg, cls = '', ico = 'info') => `<div class="notice ${cls}">${icon(ico)}<span>${msg}</span></div>`;

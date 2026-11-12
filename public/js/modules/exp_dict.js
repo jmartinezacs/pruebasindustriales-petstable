@@ -74,8 +74,8 @@ export async function etapaDictamen(pane, ctx) {
         ${listaEval(pendientes, { edit: true, completarTodo: true })}
         <div class="form-foot"><div class="form-error" role="alert"></div><button type="submit" class="btn turq">${icon('save')} Guardar valores</button></div></form>` : ''}
     <div class="grid grid-main ${puedeDict && pendientes.length ? 'mt' : ''}">
-      <div class="card">${cardHead('Resumen consolidado', 'Resultados por parámetro y recomendaciones de cada área.')}${resumenHTML(P, K, P.ejecucion_actual)}</div>
-      <div class="card">${cardHead('Dictamen y aprobación', 'Alta Dirección dictamina; si aprueba, queda autorizado implementar el cambio.')}
+      <div class="card">${cardHead('Resumen consolidado', 'Resultados por parámetro y recomendaciones de cada área.', '', 'criterios')}${resumenHTML(P, K, P.ejecucion_actual)}</div>
+      <div class="card">${cardHead('Dictamen y aprobación', 'Alta Dirección dictamina; si aprueba, queda autorizado implementar el cambio.', '', 'dictamen')}
         ${checklist(bloqueos)}
         ${E.no_cumple && P.estado === 'pendiente_dictamen' ? aviso(`${E.no_cumple} parámetro(s) no cumplen. Para aprobar, explique la decisión en la conclusión.`, 'warn', 'alert-triangle') : ''}
         ${puedeDict ? `<button class="btn violet block" data-dc="emitir">${icon('gavel')} Emitir dictamen</button>`
@@ -138,7 +138,7 @@ export async function etapaCierre(pane, ctx) {
   const { P, E } = ctx;
   if (!['aprobada', 'rechazada', 'cerrada_aprobada', 'cerrada_rechazada', 'cancelada'].includes(P.estado)) {
     pane.innerHTML = `${aviso('El cierre se realiza después del dictamen aprobado o rechazado.')}
-      <div class="card mt">${cardHead('Expediente', 'Puede imprimir el avance de la prueba en cualquier momento.', btn('data-ci="imprimir"', 'printer', 'Imprimir expediente'))}</div>`;
+      <div class="card mt">${cardHead('Expediente', 'Puede imprimir el avance de la prueba en cualquier momento.', btn('data-ci="imprimir"', 'printer', 'Imprimir expediente'), 'folio')}</div>`;
     refreshIcons();
     pane.addEventListener('click', async (e) => {
       if (!e.target.closest('[data-ci="imprimir"]')) return;
@@ -152,7 +152,7 @@ export async function etapaCierre(pane, ctx) {
   const aprobada = ['aprobada', 'cerrada_aprobada'].includes(P.estado);
   pane.innerHTML = `
     <div class="grid grid-main">
-      <div class="card">${cardHead('Expediente de cierre', '', btn('data-ci="imprimir"', 'printer', 'Imprimir expediente'))}
+      <div class="card">${cardHead('Expediente de cierre', '', btn('data-ci="imprimir"', 'printer', 'Imprimir expediente'), 'folio')}
         <div class="detail-grid">
           ${box('Folio', `<b class="mono">${esc(P.folio)}</b>`)}
           ${box('Estado', estadoPill(P.estado))}
@@ -164,7 +164,7 @@ export async function etapaCierre(pane, ctx) {
         </div>
         <div class="section-title">${icon('list-checks')} Resultados y recomendaciones</div>${resumenHTML(P, K, P.ejecucion_actual)}
       </div>
-      <div class="card">${cardHead('Cierre', 'Lo realiza la Gerencia de Procesos y Mejora Continua.')}
+      <div class="card">${cardHead('Cierre', 'Lo realiza la Gerencia de Procesos y Mejora Continua.', '', 'folio')}
         ${aprobada ? aviso(`<b>Implementación autorizada</b> en el dictamen de Alta Dirección${ult ? ` (${esc(ult.por?.nombre || '')} · ${fmtDateTime(ult.created_at)})` : ''}.`, '', 'badge-check') : ''}
         ${puedeCerrar ? `<button class="btn navy block" data-ci="cerrar">${icon('archive')} Cerrar prueba</button>` : ['aprobada', 'rechazada'].includes(P.estado) ? aviso('Cierra quien tenga autoridad de cierre para este tipo de prueba.') : ''}
         ${P.cerrada_at ? aviso(`Prueba cerrada por ${esc(P.cerrada_por_nombre || '')} el ${fmtDateTime(P.cerrada_at)}.`, '', 'archive') : ''}

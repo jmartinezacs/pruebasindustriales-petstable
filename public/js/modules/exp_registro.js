@@ -220,7 +220,7 @@ export async function montarParametrosPrueba(el, P, recargar) {
   const crit = (pl, m) => criterioTxt(pl, unidadTxt(unidades, m.unidad_id));
   const item = ({ pl, m }, area) => `<li><span>${esc(m.nombre)} <span class="cell-sub">· ${esc(medidaTxt(m, unidades))}${crit(pl, m) ? ` · criterio ${esc(crit(pl, m))}` : ''}</span></span>
     ${editaArea(area) && !usados.has(pl.id) ? iconBtn(`data-par="quitar" data-id="${esc(pl.id)}" data-nom="${esc(m.nombre)}"`, 'x', 'Quitar parámetro', 'bad') : ''}</li>`;
-  el.innerHTML = `<div class="card mt">${cardHead('Parámetros a evaluar', 'Cada área define los suyos.')}
+  el.innerHTML = `<div class="card mt">${cardHead('Parámetros a evaluar', 'Cada área define los suyos.', '', 'parametros')}
     <div class="areas-grid">${areas.map((area) => {
       const xs = porArea[area] || [], proc = xs;
       const sinDefinir = !xs.length && !(area === 'produccion' && pars.data.length);

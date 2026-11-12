@@ -9,7 +9,7 @@ import {
   sb, state, esc, icon, toast, errMsg, openModal, confirmDialog, checkForm, formValues, nullIfEmpty, numOrNull, must, mustRow,
   DataTable, paged, sanitizeSearch, debounce, fmtDate, fmtDateTime, fmtQty, pill, estadoPill, prioPill, puedeEn, autoridad,
   getCat, invalidateCat, opciones, ESTADOS_PRUEBA, etapasDe, CERRADAS, ABIERTAS, PRIORIDADES, CAMPOS_REGISTRO, AREAS, AREAS_ORDEN, avatarHTML, emptyState, errorState,
-  refreshIcons, todayISO, navigate, bindCounters, prefs, dayStartTs, dayEndTs, ayuda, avisar, fechaEjecTxt, fechaFinDe,
+  refreshIcons, todayISO, navigate, bindCounters, prefs, dayStartTs, dayEndTs, ayuda, avisar, fechaEjecTxt, fechaFinDe, emoji, ILUS_ESTADO,
 } from '../core.js';
 import { box, txt, cardHead, btn, iconBtn, aviso, vacio, accion } from './exp_comun.js';
 import { montarSelector, montarParametrosPrueba } from './exp_registro.js';
@@ -82,7 +82,7 @@ async function renderLista(params) {
     baseFilters: ['estado'],
     rowClass: (p) => `row-link ${p.prioridad === 'urgente' && !CERRADAS.includes(p.estado) ? 'row-urg' : ''}`,
     columns: [
-      { label: 'Folio', sort: 'folio', render: (p) => `<b class="mono">${esc(p.folio)}</b><div class="cell-sub">${esc(p.tipo_nombre)}</div>` },
+      { label: 'Folio', sort: 'folio', render: (p) => `<div class="folio-cell">${emoji(ILUS_ESTADO[p.estado] || 'pruebas', 'fc-ilus')}<div><b class="mono">${esc(p.folio)}</b><div class="cell-sub">${esc(p.tipo_nombre)}</div></div></div>` },
       { label: 'Prueba', sort: 'cambio', render: (p) => `<div class="cell-main">${esc(p.cambio)}</div>${objetoTxt(p) ? `<div class="cell-sub">${esc(objetoTxt(p))}</div>` : ''}` },
       { label: 'Prioridad', sort: 'prioridad', render: (p) => prioPill(p.prioridad) },
       { label: 'Responsable', render: (p) => { const rid = p.responsable_inicial_id || p.registrado_por; const u = usuarios.find((x) => x.id === rid);
@@ -341,6 +341,7 @@ function pintar() {
     <a class="back-link" href="#/pruebas">${icon('arrow-left')} Pruebas</a>
     <section class="prueba-head card">
       <div class="ph-top">
+        <span class="ph-ilus" aria-hidden="true">${emoji(ILUS_ESTADO[P.estado] || 'pruebas')}</span>
         <div class="ph-title">
           <span class="eyebrow">${esc(P.folio)} · ${esc(P.tipo_nombre)}${P.ejecucion_actual > 1 ? ` · ejecución #${P.ejecucion_actual}` : ''}</span>
           <h1>${esc(P.cambio)}</h1>
@@ -543,7 +544,7 @@ async function tabSeguimiento(pane) {
   const { data, error } = await sb.from('v_seguimiento_prubind').select('id, tipo, texto, created_at, usuario, foto_url').eq('prueba_id', P.id)
     .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(400);
   if (error) throw error;
-  pane.innerHTML = `<div class="card">${cardHead('Seguimiento', 'Notas del equipo y eventos registrados automáticamente (usuario, fecha y hora).')}
+  pane.innerHTML = `<div class="card">${cardHead('Seguimiento', 'Notas del equipo y eventos registrados automáticamente (usuario, fecha y hora).', '', 'personas')}
     <form class="note-form" id="seg-form" novalidate>
       <div class="field" style="margin:0"><label for="seg-txt" class="sr-only">Nueva nota</label>
         <textarea id="seg-txt" name="texto" maxlength="2000" rows="2" required placeholder="Nota, acuerdo u observación…" data-counter></textarea></div>

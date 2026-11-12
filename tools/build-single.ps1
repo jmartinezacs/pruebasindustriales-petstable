@@ -1,11 +1,14 @@
 ﻿# Genera la versión de UN SOLO ARCHIVO para publicar:
 #   index.html            (en la raíz del repositorio: lo que publica Vercel; todo incluido)
 #   apple-touch-icon.png  (ícono de 512 px para iPhone y Android; nítido en la pantalla de inicio)
-#   sw.js, manifest.webmanifest, notif-badge.png y notif-icon.png (notificaciones push)
+#   apple-touch-icon-180.png (ícono opaco de 180 px que pide iOS)
+#   sw.js, manifest.webmanifest, notif-badge.png, notif-badge-192.png y notif-icon.png (notificaciones push)
+#   emoji/*.svg           (ilustraciones propias; se generan con tools/gen-ilustraciones.pl)
 #   version.json          (la app lo consulta y ofrece "Actualizar" si cambia APP_VERSION)
 # a partir del código fuente en public/. Calcula los hashes de la Content-Security-Policy.
 # Uso: powershell -ExecutionPolicy Bypass -File tools\build-single.ps1
-param([string]$Src = (Join-Path $PSScriptRoot '..\public'), [string]$Out = (Join-Path $PSScriptRoot '..'))
+#     -Prueba : (solo pruebas) expone los módulos en window.__prubindModules. No usar para publicar.
+param([string]$Src = (Join-Path $PSScriptRoot '..\public'), [string]$Out = (Join-Path $PSScriptRoot '..'), [switch]$Prueba)
 $ErrorActionPreference = 'Stop'
 $Src = (Resolve-Path $Src).Path
 New-Item -ItemType Directory -Force $Out | Out-Null
@@ -49,6 +52,7 @@ foreach ($key in $order) {
   $assign = if ($names.Count) { "Object.assign(__exp, { $($names -join ', ') });" } else { '' }
   [void]$bundle.Append("`n// ===== $key.js =====`n__m['$key'] = (function () {`nconst __exp = {};`n$code`n$assign`nreturn __exp;`n})();`n")
 }
+if ($Prueba) { [void]$bundle.Append("window.__prubindModules = __m;`n") }
 [void]$bundle.Append("})();")
 $bundleJs = $bundle.ToString()
 if ($bundleJs -match '</script') { throw 'El código contiene </script>' }
@@ -56,6 +60,9 @@ if ($bundleJs -match '</script') { throw 'El código contiene </script>' }
 # ---------- 2. Recursos incrustados ----------
 $css = (Read-Text('css/app.css')) + "`n" + (Read-Text('css/prubind.css'))
 $css = $css.Replace("url('/img/logo-petstable.webp')", "url('data:image/webp;base64,$(B64 'img/logo-petstable.webp')')")
+# Firma de los créditos (Mi perfil): máscara incrustada. Se inserta después de revisar las
+# referencias externas (su base64 puede contener por casualidad textos como "/js/").
+$css = $css.Replace("url('/img/firma.png')", "url('__FIRMA_PNG__')")
 if ($css.Contains('/img/')) { throw 'Quedó una referencia a /img/ en el CSS' }
 $themeJs = (Read-Text('js/theme-init.js')).Trim()
 $configJs = (Read-Text('js/config.js')).Trim()
@@ -70,7 +77,9 @@ $m.icons = @(
   [ordered]@{ src = '/icon-256.png?v=4'; sizes = '256x256'; type = 'image/png'; purpose = 'any' },
   [ordered]@{ src = '/icon-144.png?v=4'; sizes = '144x144'; type = 'image/png'; purpose = 'any' },
   [ordered]@{ src = '/icon-96.png?v=4'; sizes = '96x96'; type = 'image/png'; purpose = 'any' },
-  [ordered]@{ src = '/icon-48.png?v=4'; sizes = '48x48'; type = 'image/png'; purpose = 'any' }
+  [ordered]@{ src = '/icon-48.png?v=4'; sizes = '48x48'; type = 'image/png'; purpose = 'any' },
+  # Silueta blanca del logotipo sobre transparente (Android solo usa el canal alfa)
+  [ordered]@{ src = '/notif-badge-192.png?v=5'; sizes = '192x192'; type = 'image/png'; purpose = 'monochrome' }
 )
 $manifestJson = $m | ConvertTo-Json -Depth 5
 
@@ -102,6 +111,7 @@ Swap '  <script type="module" src="/js/app.js?v=2.0.0"></script>' "  <script>$bu
 foreach ($ref in @('/css/', '/js/', '/img/', '/icons/', 'favicon.ico')) {
   if ($html.Contains($ref)) { throw "Quedó una referencia externa a $ref" }
 }
+$html = $html.Replace('__FIRMA_PNG__', "data:image/png;base64,$(B64 'img/firma.png')")
 $html = "<!-- Pruebas industriales · Pet's Table — archivo generado por tools/build-single.ps1. Edita las fuentes en public/ y vuelve a generar. -->`n" + $html
 [IO.File]::WriteAllText((Join-Path $Out 'index.html'), $html, $utf8)
 Copy-Item (Join-Path $Src 'apple-touch-icon.png') (Join-Path $Out 'apple-touch-icon.png') -Force
@@ -110,8 +120,13 @@ Copy-Item (Join-Path $Src 'sw.js') (Join-Path $Out 'sw.js') -Force
 [IO.File]::WriteAllText((Join-Path $Out 'manifest.webmanifest'), $manifestJson + "`n", $utf8)
 # Insignia monocromática (barra de estado de Android) e ícono grande de respaldo
 Copy-Item (Join-Path $Src 'img/notif-badge.png') (Join-Path $Out 'notif-badge.png') -Force
+Copy-Item (Join-Path $Src 'img/notif-badge-192.png') (Join-Path $Out 'notif-badge-192.png') -Force
+Copy-Item (Join-Path $Src 'apple-touch-icon-180.png') (Join-Path $Out 'apple-touch-icon-180.png') -Force
+# Ilustraciones propias: archivos SVG cacheables (no se incrustan en el HTML)
+New-Item -ItemType Directory -Force (Join-Path $Out 'emoji') | Out-Null
+Copy-Item (Join-Path $Src 'emoji\*') (Join-Path $Out 'emoji') -Force
 Copy-Item (Join-Path $Src 'img/notif-icon.png') (Join-Path $Out 'notif-icon.png') -Force
 foreach ($s in 48, 96, 144, 256) { Copy-Item (Join-Path $Src "icons/icon-$s.png") (Join-Path $Out "icon-$s.png") -Force }
 if ($configJs -notmatch 'APP_VERSION:\s*"([^"]+)"') { throw 'No se encontró APP_VERSION en config.js' }
 [IO.File]::WriteAllText((Join-Path $Out 'version.json'), "{`"version`":`"$($Matches[1])`"}`n", $utf8)
-Get-Item (@('index.html', 'apple-touch-icon.png', 'sw.js', 'manifest.webmanifest', 'version.json', 'notif-badge.png', 'notif-icon.png') | ForEach-Object { Join-Path $Out $_ }) | ForEach-Object { '{0,-24} {1,10:N0} bytes' -f $_.Name, $_.Length }
+Get-Item (@('index.html', 'apple-touch-icon.png', 'apple-touch-icon-180.png', 'sw.js', 'manifest.webmanifest', 'version.json', 'notif-badge.png', 'notif-badge-192.png', 'notif-icon.png') | ForEach-Object { Join-Path $Out $_ }) | ForEach-Object { '{0,-24} {1,10:N0} bytes' -f $_.Name, $_.Length }

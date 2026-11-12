@@ -4,7 +4,7 @@
 import {
   sb, state, prefs, esc, icon, refreshIcons, toast, errMsg, openModal, checkForm,
   destroyCharts, APP_VERSION, TZ, navigate, avatarHTML, restyleCharts, autoridadAlguna, push,
-  BASE, EN_PORTAL, K_REMEMBER, K_THEME,
+  BASE, EN_PORTAL, K_REMEMBER, K_THEME, emoji,
 } from './core.js';
 import dashboard from './modules/dashboard.js';
 import pruebas, { openRegistro } from './modules/pruebas.js';
@@ -17,20 +17,23 @@ import bitacora from './modules/bitacora.js';
 import perfil from './modules/perfil.js';
 import { montarCampana } from './modules/campana.js';
 
+// ilus: ilustración a color del menú y del dock (public/emoji); icon: respaldo lucide
+// mobile: acceso en el dock del celular (máximo 5)
 const ROUTES = {
-  panel:     { mod: dashboard, icon: 'layout-dashboard', label: 'Panel',               roles: ['admin', 'usuario'], mobile: true },
-  pruebas:   { mod: pruebas,   icon: 'flask-conical',    label: 'Pruebas',             roles: ['admin', 'usuario'], mobile: true },
+  panel:     { mod: dashboard, icon: 'layout-dashboard', ilus: 'n_panel',     label: 'Panel',               roles: ['admin', 'usuario'], mobile: true },
+  pruebas:   { mod: pruebas,   icon: 'flask-conical',    ilus: 'pruebas',     label: 'Pruebas',             roles: ['admin', 'usuario'], mobile: true },
   // Sin batches planeados (v4.2): los batches se consultan dentro de cada prueba; la vista queda fuera del menú
-  ejecucion: { mod: programa,  icon: 'factory',          label: 'Batches ejecutados',  roles: ['admin', 'usuario'], oculto: true },
+  ejecucion: { mod: programa,  icon: 'factory',          ilus: 'cocimiento',  label: 'Batches ejecutados',  roles: ['admin', 'usuario'], oculto: true },
   // Sin etapa de preparación (v4): el abastecimiento queda solo como consulta histórica, fuera del menú
-  abastecimiento: { mod: insumos, icon: 'package',       label: 'Abastecimiento',      roles: ['admin', 'usuario'], oculto: true },
-  recetas:   { mod: recetas,   icon: 'book-open',        label: 'Recetas',             roles: ['admin', 'usuario'] },
-  catalogos: { mod: catalogos, icon: 'database',         label: 'Catálogos',           roles: ['admin'], abasto: true },
-  usuarios:  { mod: usuarios,  icon: 'user-cog',         label: 'Usuarios',            roles: ['admin', 'usuario'] },
-  bitacora:  { mod: bitacora,  icon: 'history',          label: 'Bitácora',            roles: ['admin'] },
-  perfil:    { mod: perfil,    icon: 'circle-user',      label: 'Mi perfil',           roles: ['admin', 'usuario'], mobile: true },
+  abastecimiento: { mod: insumos, icon: 'package',       ilus: 'abastecimiento', label: 'Abastecimiento',   roles: ['admin', 'usuario'], oculto: true },
+  recetas:   { mod: recetas,   icon: 'book-open',        ilus: 'receta',      label: 'Recetas',             roles: ['admin', 'usuario'], mobile: true },
+  catalogos: { mod: catalogos, icon: 'database',         ilus: 'n_catalogos', label: 'Catálogos',           roles: ['admin'], abasto: true },
+  usuarios:  { mod: usuarios,  icon: 'user-cog',         ilus: 'n_usuarios',  label: 'Usuarios',            roles: ['admin', 'usuario'], mobile: true },
+  bitacora:  { mod: bitacora,  icon: 'history',          ilus: 'n_bitacora',  label: 'Bitácora',            roles: ['admin'] },
+  perfil:    { mod: perfil,    icon: 'circle-user',      ilus: 'n_perfil',    label: 'Mi perfil',           roles: ['admin', 'usuario'], mobile: true },
 };
-const MOBILE_LABEL = { ejecucion: 'Batches', abastecimiento: 'Abasto' };
+const MOBILE_LABEL = { ejecucion: 'Batches', abastecimiento: 'Abasto', perfil: 'Perfil' };
+const navIco = (r) => (r.ilus ? emoji(r.ilus, 'nav-ilus') : icon(r.icon));
 // Rutas anteriores (v1) que se redirigen a su equivalente actual
 const ALIAS = { programa: 'ejecucion', insumos: 'abastecimiento' };
 
@@ -203,9 +206,9 @@ function allowed(name) {
 
 function buildNav() {
   const items = Object.entries(ROUTES).filter(([k, r]) => allowed(k) && !r.oculto);
-  $('#nav').innerHTML = items.map(([k, r]) => `<a href="#/${k}" data-route="${k}">${icon(r.icon)}<span>${esc(r.label)}</span></a>`).join('');
+  $('#nav').innerHTML = items.map(([k, r]) => `<a href="#/${k}" data-route="${k}">${navIco(r)}<span>${esc(r.label)}</span></a>`).join('');
   $('#mobile-nav').innerHTML = items.filter(([, r]) => r.mobile).slice(0, 5)
-    .map(([k, r]) => `<a href="#/${k}" data-route="${k}">${icon(r.icon)}<span>${esc(MOBILE_LABEL[k] || r.label)}</span></a>`).join('');
+    .map(([k, r]) => `<a href="#/${k}" data-route="${k}">${navIco(r)}<span>${esc(MOBILE_LABEL[k] || r.label)}</span></a>`).join('');
   refreshIcons();
 }
 
@@ -242,14 +245,20 @@ async function route() {
     // Contenedor nuevo en cada vista: los listeners de la vista anterior no se acumulan
     const old = $('#view');
     const view = old.cloneNode(false);
+    view.classList.add('entra'); // aparición suave de la vista (una vez por montaje)
     old.replaceWith(view);
     window.scrollTo(0, 0);
+    document.body.classList.add('cargando'); // barra de carga bajo el encabezado
     await r.mod.render(view, params);
+    // Ilustración de la sección junto al título de la vista
+    const intro = view.querySelector('.page-intro');
+    if (intro && r.ilus && !intro.querySelector('.pi-ilus')) intro.insertAdjacentHTML('afterbegin', `<span class="pi-ilus" aria-hidden="true">${emoji(r.ilus)}</span>`);
     refreshIcons();
   } catch (err) {
     console.error(err);
     $('#view').innerHTML = `<div class="card">${esc(errMsg(err))}</div>`;
   } finally {
+    document.body.classList.remove('cargando');
     routing = false;
     if (pendingRoute) { pendingRoute = false; route(); }
   }
