@@ -1033,3 +1033,6 @@ p.pre { white-space: pre-wrap; margin: 8px 0 0; }
 .portal-btn { text-decoration: none; }
 html:not(.en-portal) .portal-btn { display: none !important; }
 .side-portal { margin-bottom: 8px; background: rgba(27, 199, 199, .1); color: #7FE3E3; }
+
+/* Volver al portal: botón flotante (mismo tamaño y comportamiento que los demás; solo dentro del portal) */
+.fab-portal { background: linear-gradient(135deg, #0FA3A6, #1BC7C7); text-decoration: none; }
