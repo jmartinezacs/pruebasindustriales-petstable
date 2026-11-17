@@ -71,13 +71,13 @@ $configJs = (Read-Text('js/config.js')).Trim()
 # Sus íconos apuntan a archivos publicados en la raíz.
 $m = Get-Content (Join-Path $Src 'manifest.webmanifest') -Raw -Encoding UTF8 | ConvertFrom-Json
 $m.icons = @(
-  [ordered]@{ src = '/apple-touch-icon.png?v=4'; sizes = '512x512'; type = 'image/png'; purpose = 'any' },
-  [ordered]@{ src = '/notif-icon.png?v=4'; sizes = '192x192'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/apple-touch-icon.png?v=20'; sizes = '512x512'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/notif-icon.png?v=20'; sizes = '192x192'; type = 'image/png'; purpose = 'any' },
   # Tamaños exactos que usa Windows para el acceso directo de la app instalada
-  [ordered]@{ src = '/icon-256.png?v=4'; sizes = '256x256'; type = 'image/png'; purpose = 'any' },
-  [ordered]@{ src = '/icon-144.png?v=4'; sizes = '144x144'; type = 'image/png'; purpose = 'any' },
-  [ordered]@{ src = '/icon-96.png?v=4'; sizes = '96x96'; type = 'image/png'; purpose = 'any' },
-  [ordered]@{ src = '/icon-48.png?v=4'; sizes = '48x48'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/icon-256.png?v=20'; sizes = '256x256'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/icon-144.png?v=20'; sizes = '144x144'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/icon-96.png?v=20'; sizes = '96x96'; type = 'image/png'; purpose = 'any' },
+  [ordered]@{ src = '/icon-48.png?v=20'; sizes = '48x48'; type = 'image/png'; purpose = 'any' },
   # Silueta blanca del logotipo sobre transparente (Android solo usa el canal alfa)
   [ordered]@{ src = '/notif-badge-192.png?v=5'; sizes = '192x192'; type = 'image/png'; purpose = 'monochrome' }
 )
