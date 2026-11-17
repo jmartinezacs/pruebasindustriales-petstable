@@ -219,9 +219,9 @@ async function imprimir(P, datos) {
   const logo = logoURL();
   const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(P.folio)} · Expediente</title>
     <style>body{font:12px/1.45 Segoe UI,Arial,sans-serif;color:#111;margin:24px}
-    .enc{display:flex;align-items:center;gap:16px;border-bottom:3px solid #F58020;padding-bottom:10px;margin-bottom:6px}.enc img{height:58px;width:auto}
+    .enc{display:flex;align-items:center;gap:16px;border-bottom:3px solid #7E22CE;padding-bottom:10px;margin-bottom:6px}.enc img{height:58px;width:auto}
     .enc h1{font-size:18px;margin:0}.enc .muted{margin-top:2px}
-    h2{font-size:14px;border-bottom:2px solid #F58020;padding-bottom:3px;margin:18px 0 8px;break-after:avoid}h3{font-size:12.5px;margin:10px 0 4px}
+    h2{font-size:14px;border-bottom:2px solid #7E22CE;padding-bottom:3px;margin:18px 0 8px;break-after:avoid}h3{font-size:12.5px;margin:10px 0 4px}
     table{width:100%;border-collapse:collapse;margin:4px 0}th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;vertical-align:top}th{background:#f4f4f4;width:28%}
     .t th{width:auto}.muted{color:#666}.bad{color:#b42318;font-weight:600}.ok{color:#067647;font-weight:600}.warn{color:#b54708;font-weight:600}
     .firmas{display:flex;gap:40px;justify-content:space-around;margin-top:56px;break-inside:avoid}.firma{flex:1;max-width:280px;text-align:center;display:flex;flex-direction:column;gap:2px}
