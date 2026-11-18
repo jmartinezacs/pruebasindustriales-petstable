@@ -89,7 +89,7 @@ if (-not $supa) { throw 'No se encontró SUPABASE_URL en config.js' }
 $wss = $supa.Replace('https://', 'wss://')
 $csp = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net '$(Sha $themeJs)' '$(Sha $configJs)' '$(Sha $bundleJs)'; " +
        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; " +
-       "img-src 'self' data: blob: $supa; connect-src 'self' $supa $wss; " +
+       "img-src 'self' data: blob: https://portal-petstable.vercel.app $supa; connect-src 'self' $supa $wss; " +
        "manifest-src 'self'; worker-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
 $icon128 = 'data:image/png;base64,' + (B64 'img/app-icon-128.png')
 $fav64 = 'data:image/png;base64,' + (B64 'icons/favicon-64.png')
