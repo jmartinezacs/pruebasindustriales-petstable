@@ -1347,3 +1347,33 @@ html:not(.en-portal) .portal-btn { display: none !important; }
 }
 @keyframes pt3dEntra { from { opacity: 0; transform: translateY(14px) scale(.98); } }
 @media (prefers-reduced-motion: reduce) { :root .kx { animation: none; } :root .kx:hover, :root .kx:hover .kx-ico { transform: none; } }
+
+/* =====================================================================
+   Ecosistema Pet's Table · Botones flotantes estándar (v1, nov-2026)
+   Mismo efecto, animación y microinteracciones que Ruta de calidad y Servicio médico:
+   brillo superior, anillo, halo al aparecer, rebote al pasar el cursor y al tocar.
+   La campana es la dorada de Pruebas industriales (sin fondo, se mece si hay pendientes).
+   ===================================================================== */
+:root .fab { width: 60px; height: 60px; border: 0; isolation: isolate; transition: transform .2s cubic-bezier(.3, 1.4, .5, 1), box-shadow .2s; }
+:root .fab svg:not(.bell-svg) { width: 26px; height: 26px; stroke-width: 2.2; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .25)); }
+:root .fab-cita { background: radial-gradient(circle at 32% 24%, rgba(255, 255, 255, .38), transparent 48%), linear-gradient(160deg, color-mix(in srgb, var(--orange) 88%, #fff), color-mix(in srgb, var(--orange) 82%, #000));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--card) 88%, transparent), 0 14px 28px -8px color-mix(in srgb, var(--orange) 55%, transparent), inset 0 -3px 0 rgba(0, 0, 0, .12); }
+:root .fab-cita::after { content: ""; position: absolute; z-index: -1; inset: -3px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--orange) 55%, transparent); opacity: 0; animation: fabHalo 2.6s 1.2s ease-out 2; pointer-events: none; }
+@keyframes fabHalo { 0% { opacity: .9; transform: scale(.9); } 100% { opacity: 0; transform: scale(1.35); } }
+:root .fab-home { border: 0; background: radial-gradient(circle at 32% 24%, rgba(255, 255, 255, .2), transparent 48%), linear-gradient(160deg, #24496B, #0B2235);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--card) 88%, transparent), inset 0 0 0 2px rgba(27, 199, 199, .55), 0 14px 28px -10px rgba(2, 12, 20, .6); }
+:root .fab:hover, :root .fab:focus-visible { transform: translateY(-3px) scale(1.05); }
+:root .fab-cita:hover, :root .fab-cita:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--card) 88%, transparent), 0 0 0 7px color-mix(in srgb, var(--orange) 20%, transparent), 0 18px 32px -8px color-mix(in srgb, var(--orange) 55%, transparent); }
+:root .fab-home:hover, :root .fab-home:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--card) 88%, transparent), inset 0 0 0 2px rgba(27, 199, 199, .8), 0 0 0 7px rgba(27, 199, 199, .18), 0 18px 32px -10px rgba(2, 12, 20, .6); }
+:root .fab:active { transform: scale(.94); }
+:root .fab-tip { border-radius: 10px; padding: 7px 11px; box-shadow: 0 10px 22px -10px rgba(0, 0, 0, .5); }
+/* Campana (referencia: Pruebas industriales) */
+:root .fabs .fab-bell, :root .fabs .fab-bell:hover, :root .fabs .fab-bell:focus-visible { background: transparent; border: 0; box-shadow: none; }
+:root .fabs .fab-bell .bell-svg { width: 54px; height: 54px; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .35)); transition: filter .2s; }
+:root .fabs .fab-bell:hover .bell-svg { filter: drop-shadow(0 6px 10px rgba(224, 134, 0, .55)); }
+:root .fabs .fab-bell.has .bell-svg { animation: campana 2.4s ease-in-out infinite; transform-origin: 50% 12%; }
+@keyframes campana { 0%, 88%, 100% { transform: rotate(0); } 91% { transform: rotate(14deg); } 94% { transform: rotate(-12deg); } 97% { transform: rotate(6deg); } }
+:root .fabs .fab-bell .fab-badge { position: absolute; top: 2px; right: 0; margin: 0; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 999px; background: #DC2626; color: #fff; font-size: 12px; font-weight: 900; border: 2px solid #fff; display: grid; place-items: center; line-height: 1; }
+:root .fabs .fab-bell .fab-badge.hidden { display: none; }
+@media (max-width: 720px) { :root .fab { width: 54px; height: 54px; } :root .fab svg:not(.bell-svg) { width: 24px; height: 24px; } :root .fabs .fab-bell .bell-svg { width: 48px; height: 48px; } }
+@media (prefers-reduced-motion: reduce) { :root .fab, :root .fab-cita::after, :root .fabs .fab-bell.has .bell-svg { animation: none !important; transition: none !important; } }
