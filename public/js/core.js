@@ -195,7 +195,21 @@ export function refreshIcons() { try { window.lucide?.createIcons(); } catch { /
 
 // ---------- Ilustraciones propias (public/emoji, generadas desde fuentes/ilustraciones.src) ----------
 // Ruta relativa: funciona sola en / y dentro del Portal en /pruebas-industriales/. Decorativas (alt vacío).
-export const emoji = (slug, cls = '') => `<img class="emoji ${cls}" src="emoji/${slug}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">`;
+// ---------------- Imágenes realistas (estándar Pet's Table, fase 2) ----------------
+// Las ilustraciones se pueden sustituir por imágenes realistas en public/iconos3d/<nombre>.webp
+// (256 × 256, fondo transparente; ver el README de esa carpeta). Solo se usan los nombres listados en
+// ICONOS_3D; los demás conservan su ilustración. Si una imagen no carga, vuelve sola a la ilustración.
+export const ICONOS_3D = new Set([]);
+const ICO3D_VER = '1';
+export function con3d(n) { return !!n && ICONOS_3D.has(n); }
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.classList.contains('ico3d') || !img.dataset.respaldo) return;
+  const r = img.dataset.respaldo; delete img.dataset.respaldo; img.classList.remove('ico3d'); img.src = r;
+}, true);
+export const emoji = (slug, cls = '') => (con3d(slug)
+  ? `<img class="emoji ico3d ${cls}" src="iconos3d/${slug}.webp?v=${ICO3D_VER}" data-respaldo="emoji/${slug}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">`
+  : `<img class="emoji ${cls}" src="emoji/${slug}.svg" alt="" aria-hidden="true" loading="lazy" decoding="async">`);
 // Ilustración de cada estado de la prueba y de cada etapa del expediente
 export const ILUS_ESTADO = {
   registrada: 'calendario', en_preparacion: 'calendario', preparada: 'calendario', en_ejecucion: 'en_curso',
